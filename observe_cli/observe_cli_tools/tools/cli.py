@@ -254,9 +254,329 @@ class CLITools:
                     ;;
             esac
             
-            # Check if curl command was successful
-            if [ $? -ne 0 ]; then
-                echo "Error: Failed to execute API call"
+            # Check if curl command was successful and capture any errors
+            curl_exit_code=$?
+            if [ $curl_exit_code -ne 0 ]; then
+                echo "Error: Failed to execute API call (curl exit code: $curl_exit_code)"
+                echo ""
+                echo "=== Debug Information ==="
+                echo "Command: $command"
+                echo "Operation: $OPERATION"
+                echo "Sub-operation: $SUB_OPERATION"
+                echo "Base URL: $OBSERVE_BASE_URL"
+                echo "Headers: $HEADERS"
+                echo "Curl Exit Code: $curl_exit_code"
+                echo ""
+                
+                # Provide specific error messages based on curl exit codes
+                case $curl_exit_code in
+                    1)
+                        echo "❌ Curl Error 1: Unsupported protocol"
+                        ;;
+                    2)
+                        echo "❌ Curl Error 2: Failed to initialize"
+                        ;;
+                    3)
+                        echo "❌ Curl Error 3: URL malformed"
+                        ;;
+                    4)
+                        echo "❌ Curl Error 4: URL user part was malformed"
+                        ;;
+                    5)
+                        echo "❌ Curl Error 5: Couldn't resolve proxy"
+                        ;;
+                    6)
+                        echo "❌ Curl Error 6: Couldn't resolve host"
+                        echo "Check if the base URL is correct: $OBSERVE_BASE_URL"
+                        ;;
+                    7)
+                        echo "❌ Curl Error 7: Failed to connect to host"
+                        echo "Check network connectivity to: $OBSERVE_BASE_URL"
+                        ;;
+                    8)
+                        echo "❌ Curl Error 8: Weird server reply"
+                        ;;
+                    9)
+                        echo "❌ Curl Error 9: Remote access denied"
+                        ;;
+                    10)
+                        echo "❌ Curl Error 10: FTP accept failed"
+                        ;;
+                    11)
+                        echo "❌ Curl Error 11: FTP weird PASS reply"
+                        ;;
+                    12)
+                        echo "❌ Curl Error 12: FTP weird USER reply"
+                        ;;
+                    13)
+                        echo "❌ Curl Error 13: FTP weird PASV reply"
+                        ;;
+                    14)
+                        echo "❌ Curl Error 14: FTP weird 227 format"
+                        ;;
+                    15)
+                        echo "❌ Curl Error 15: FTP can't get host"
+                        ;;
+                    16)
+                        echo "❌ Curl Error 16: HTTP/2 error"
+                        ;;
+                    17)
+                        echo "❌ Curl Error 17: FTP couldn't set binary"
+                        ;;
+                    18)
+                        echo "❌ Curl Error 18: Partial file"
+                        ;;
+                    19)
+                        echo "❌ Curl Error 19: FTP couldn't download/access the given file"
+                        ;;
+                    20)
+                        echo "❌ Curl Error 20: FTP write error"
+                        ;;
+                    21)
+                        echo "❌ Curl Error 21: FTP read error"
+                        ;;
+                    22)
+                        echo "❌ Curl Error 22: FTP quote error"
+                        ;;
+                    23)
+                        echo "❌ Curl Error 23: HTTP page not retrieved"
+                        ;;
+                    25)
+                        echo "❌ Curl Error 25: FTP couldn't STOR file"
+                        ;;
+                    26)
+                        echo "❌ Curl Error 26: Read error"
+                        ;;
+                    27)
+                        echo "❌ Curl Error 27: Out of memory"
+                        ;;
+                    28)
+                        echo "❌ Curl Error 28: Operation timeout"
+                        echo "The request timed out. Check network connectivity."
+                        ;;
+                    30)
+                        echo "❌ Curl Error 30: FTP PORT failed"
+                        ;;
+                    31)
+                        echo "❌ Curl Error 31: FTP couldn't use REST"
+                        ;;
+                    33)
+                        echo "❌ Curl Error 33: HTTP range error"
+                        ;;
+                    34)
+                        echo "❌ Curl Error 34: HTTP post error"
+                        ;;
+                    35)
+                        echo "❌ Curl Error 35: SSL connect error"
+                        echo "SSL/TLS connection failed. Check if the endpoint supports HTTPS."
+                        ;;
+                    36)
+                        echo "❌ Curl Error 36: Bad download resume"
+                        ;;
+                    37)
+                        echo "❌ Curl Error 37: FILE couldn't read file"
+                        ;;
+                    38)
+                        echo "❌ Curl Error 38: LDAP cannot bind"
+                        ;;
+                    39)
+                        echo "❌ Curl Error 39: LDAP search failed"
+                        ;;
+                    41)
+                        echo "❌ Curl Error 41: Function not found"
+                        ;;
+                    42)
+                        echo "❌ Curl Error 42: Aborted by callback"
+                        ;;
+                    43)
+                        echo "❌ Curl Error 43: Bad function argument"
+                        ;;
+                    45)
+                        echo "❌ Curl Error 45: Interface failed"
+                        ;;
+                    47)
+                        echo "❌ Curl Error 47: Too many redirects"
+                        ;;
+                    48)
+                        echo "❌ Curl Error 48: Unknown option specified to libcurl"
+                        ;;
+                    49)
+                        echo "❌ Curl Error 49: Malformed telnet option"
+                        ;;
+                    51)
+                        echo "❌ Curl Error 51: The peer's SSL certificate or SSH MD5 fingerprint was not OK"
+                        ;;
+                    52)
+                        echo "❌ Curl Error 52: The server didn't reply anything"
+                        ;;
+                    53)
+                        echo "❌ Curl Error 53: SSL crypto engine not found"
+                        ;;
+                    54)
+                        echo "❌ Curl Error 54: Cannot set SSL crypto engine as default"
+                        ;;
+                    55)
+                        echo "❌ Curl Error 55: Failed sending network data"
+                        ;;
+                    56)
+                        echo "❌ Curl Error 56: Failure in receiving network data"
+                        ;;
+                    58)
+                        echo "❌ Curl Error 58: Problem with the local certificate"
+                        ;;
+                    59)
+                        echo "❌ Curl Error 59: Couldn't use specified SSL cipher"
+                        ;;
+                    60)
+                        echo "❌ Curl Error 60: Peer certificate cannot be authenticated with known CA certificates"
+                        ;;
+                    61)
+                        echo "❌ Curl Error 61: Unrecognized transfer encoding"
+                        ;;
+                    62)
+                        echo "❌ Curl Error 62: Invalid LDAP URL"
+                        ;;
+                    63)
+                        echo "❌ Curl Error 63: Maximum file size exceeded"
+                        ;;
+                    64)
+                        echo "❌ Curl Error 64: Requested FTP SSL level failed"
+                        ;;
+                    65)
+                        echo "❌ Curl Error 65: Sending the data requires a rewind that failed"
+                        ;;
+                    66)
+                        echo "❌ Curl Error 66: Failed to initialise SSL engine"
+                        ;;
+                    67)
+                        echo "❌ Curl Error 67: The user name, password, or similar was not accepted and curl failed to log in"
+                        ;;
+                    68)
+                        echo "❌ Curl Error 68: File not found on TFTP server"
+                        ;;
+                    69)
+                        echo "❌ Curl Error 69: Permission problem on TFTP server"
+                        ;;
+                    70)
+                        echo "❌ Curl Error 70: Out of disk space on TFTP server"
+                        ;;
+                    71)
+                        echo "❌ Curl Error 71: Illegal TFTP operation"
+                        ;;
+                    72)
+                        echo "❌ Curl Error 72: Unknown TFTP transfer ID"
+                        ;;
+                    73)
+                        echo "❌ Curl Error 73: File already exists (TFTP)"
+                        ;;
+                    74)
+                        echo "❌ Curl Error 74: No such user (TFTP)"
+                        ;;
+                    75)
+                        echo "❌ Curl Error 75: Character conversion failed"
+                        ;;
+                    76)
+                        echo "❌ Curl Error 76: Character conversion functions required"
+                        ;;
+                    77)
+                        echo "❌ Curl Error 77: Problem with reading the SSL CA cert"
+                        ;;
+                    78)
+                        echo "❌ Curl Error 78: The resource referenced in the URL does not exist"
+                        ;;
+                    79)
+                        echo "❌ Curl Error 79: An unspecified error occurred during the SSH session"
+                        ;;
+                    80)
+                        echo "❌ Curl Error 80: Failed to shut down the SSL connection"
+                        ;;
+                    82)
+                        echo "❌ Curl Error 82: Could not load CRL file"
+                        ;;
+                    83)
+                        echo "❌ Curl Error 83: Issuer check failed"
+                        ;;
+                    84)
+                        echo "❌ Curl Error 84: The FTP PRET command failed"
+                        ;;
+                    85)
+                        echo "❌ Curl Error 85: RTSP: mismatch of CSeq numbers"
+                        ;;
+                    86)
+                        echo "❌ Curl Error 86: RTSP: mismatch of Session Identifiers"
+                        ;;
+                    87)
+                        echo "❌ Curl Error 87: unable to parse FTP file list"
+                        ;;
+                    88)
+                        echo "❌ Curl Error 88: FTP chunk callback reported error"
+                        ;;
+                    89)
+                        echo "❌ Curl Error 89: No connection available, the session will be queued"
+                        ;;
+                    90)
+                        echo "❌ Curl Error 90: SSL public key does not matched pinned public key"
+                        ;;
+                    91)
+                        echo "❌ Curl Error 91: Invalid SSL certificate status"
+                        ;;
+                    92)
+                        echo "❌ Curl Error 92: Stream error in HTTP/2 framing layer"
+                        ;;
+                    93)
+                        echo "❌ Curl Error 93: An API function was called from inside a callback"
+                        ;;
+                    94)
+                        echo "❌ Curl Error 94: An authentication function returned an error"
+                        ;;
+                    95)
+                        echo "❌ Curl Error 95: A problem was detected in the HTTP/3 layer"
+                        ;;
+                    96)
+                        echo "❌ Curl Error 96: QUIC connection error"
+                        ;;
+                    97)
+                        echo "❌ Curl Error 97: Proxy handshake error"
+                        ;;
+                    98)
+                        echo "❌ Curl Error 98: A client-side certificate is required to complete the TLS handshake"
+                        ;;
+                    *)
+                        echo "❌ Curl Error $curl_exit_code: Unknown error"
+                        ;;
+                esac
+                
+                echo ""
+                echo "=== Troubleshooting Steps ==="
+                echo "1. Check if OBSERVE_API_KEY is set correctly"
+                echo "2. Check if OBSERVE_CUSTOMER_ID is set correctly"
+                echo "3. Verify network connectivity to $OBSERVE_BASE_URL"
+                echo "4. Check if the endpoint exists and is accessible"
+                echo "5. Verify SSL/TLS connectivity (if using HTTPS)"
+                echo ""
+                
+                # Test authentication
+                echo "=== Authentication Test ==="
+                if [ -n "$OBSERVE_API_KEY" ]; then
+                    echo "✅ API Key is set (length: ${#OBSERVE_API_KEY} characters)"
+                else
+                    echo "❌ API Key is not set"
+                fi
+                
+                if [ -n "$OBSERVE_CUSTOMER_ID" ]; then
+                    echo "✅ Customer ID is set: $OBSERVE_CUSTOMER_ID"
+                else
+                    echo "❌ Customer ID is not set"
+                fi
+                
+                # Try a simple connectivity test
+                echo "=== Connectivity Test ==="
+                if curl -s --connect-timeout 10 --max-time 30 "$OBSERVE_BASE_URL" >/dev/null 2>&1; then
+                    echo "✅ Base URL is reachable"
+                else
+                    echo "❌ Cannot reach base URL - check network connectivity"
+                fi
+                
                 exit 1
             fi
             
