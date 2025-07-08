@@ -27,42 +27,79 @@ class CLITools:
         """Execute any Datadog CLI command."""
         return DatadogCLITool(
             name="datadog_cli_command",
-            description="Execute any Datadog CLI command with full functionality",
+            description="Execute any Datadog CLI command with full functionality using Dogshell",
             content="""
+            # Install datadog package if not already installed
+            pip install datadog --quiet
+            
+            # Create .dogrc configuration file
+            mkdir -p ~
+            cat > ~/.dogrc << EOF
+            [Connection]
+            apikey = $DD_API_KEY
+            appkey = $DD_APP_KEY
+            api_host = https://api.$DD_SITE
+            EOF
+            
             # Validate required parameters
             if [ -z "$command" ]; then
-                echo "Error: Command is required"
-                echo "Usage: Provide a Datadog CLI command (e.g., 'monitor list', 'dashboard list')"
+                echo "❌ Error: Command is required"
+                echo ""
+                echo "Usage: Provide a Dogshell command (e.g., 'monitor list', 'dashboard list')"
+                echo ""
+                echo "Common commands:"
+                echo "  • monitor list          - List all monitors"
+                echo "  • dashboard list        - List all dashboards"
+                echo "  • metric post           - Post a metric"
+                echo "  • event post            - Post an event"
+                echo "  • host list             - List hosts"
+                echo "  • tag list              - List tags"
+                echo "  • search                - Search metrics/events"
+                echo "  • comment post          - Post a comment"
                 exit 1
             fi
             
             # Validate authentication environment variables
             if [ -z "$DD_API_KEY" ]; then
                 echo "❌ Error: DD_API_KEY environment variable is not set"
-                echo "Please configure your Datadog API key"
+                echo ""
+                echo "💡 Hint: Set your Datadog API key:"
+                echo "  export DD_API_KEY='your-api-key-here'"
+                echo ""
+                echo "You can find your API key in Datadog:"
+                echo "  Settings → API Keys → Create API Key"
                 exit 1
             fi
             
             if [ -z "$DD_APP_KEY" ]; then
                 echo "❌ Error: DD_APP_KEY environment variable is not set"
-                echo "Please configure your Datadog Application key"
+                echo ""
+                echo "💡 Hint: Set your Datadog Application key:"
+                echo "  export DD_APP_KEY='your-app-key-here'"
+                echo ""
+                echo "You can find your Application key in Datadog:"
+                echo "  Settings → Application Keys → Create Application Key"
                 exit 1
             fi
             
             if [ -z "$DD_SITE" ]; then
                 echo "❌ Error: DD_SITE environment variable is not set"
-                echo "Please configure your Datadog site"
+                echo ""
+                echo "💡 Hint: Set your Datadog site:"
+                echo "  export DD_SITE='datadoghq.com'  # US site"
+                echo "  export DD_SITE='datadoghq.eu'   # EU site"
+                echo "  export DD_SITE='us3.datadoghq.com'  # US3 site"
                 exit 1
             fi
             
-            echo "=== Executing Datadog CLI Command ==="
-            echo "Command: datadog $command"
+            echo "=== Executing Datadog Command with Dogshell ==="
+            echo "Command: dog $command"
             echo "Site: $DD_SITE"
             echo "Timestamp: $(date)"
             echo ""
             
             # Capture command output and error
-            output=$(datadog $command 2>&1)
+            output=$(dog $command 2>&1)
             exit_code=$?
             
             if [ $exit_code -eq 0 ]; then
@@ -80,17 +117,17 @@ class CLITools:
                 if echo "$output" | grep -q "command not found\|unknown command"; then
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
-                    echo "Common Datadog CLI commands:"
-                    echo "  • datadog monitor list"
-                    echo "  • datadog dashboard list"
-                    echo "  • datadog logs list"
-                    echo "  • datadog service list"
-                    echo "  • datadog host list"
-                    echo "  • datadog metric list"
-                    echo "  • datadog user list"
-                    echo "  • datadog org list"
+                    echo "Common dog commands:"
+                    echo "  • dog monitor list"
+                    echo "  • dog dashboard list"
+                    echo "  • dog metric post"
+                    echo "  • dog event post"
+                    echo "  • dog host list"
+                    echo "  • dog tag list"
+                    echo "  • dog search"
+                    echo "  • dog comment post"
                     echo ""
-                    echo "💡 Tip: Use 'datadog --help' to see all available commands"
+                    echo "💡 Tip: Use 'dog -h' to see all available commands"
                 elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
                     echo "💡 Hint: Authentication failed. Please check:"
                     echo "  • DD_API_KEY is correct and has proper permissions"
@@ -112,13 +149,13 @@ class CLITools:
                 elif echo "$output" | grep -q "invalid\|syntax\|malformed"; then
                     echo "💡 Hint: Invalid command syntax."
                     echo "  • Check command spelling and format"
-                    echo "  • Use 'datadog $command --help' for usage information"
+                    echo "  • Use 'dog $command -h' for usage information"
                     echo "  • Verify required parameters are provided"
                 else
                     echo "💡 General troubleshooting tips:"
-                    echo "  • Use 'datadog --help' to see available commands"
-                    echo "  • Use 'datadog $command --help' for specific command help"
-                    echo "  • Check Datadog documentation: https://docs.datadoghq.com/cli/"
+                    echo "  • Use 'dog -h' to see available commands"
+                    echo "  • Use 'dog $command -h' for specific command help"
+                    echo "  • Check Dogshell documentation: https://docs.datadoghq.com/developers/guide/dogshell/"
                     echo "  • Verify your Datadog account permissions"
                 fi
                 
@@ -126,9 +163,9 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="command", description="The command to pass to the Datadog CLI (e.g., 'monitor list', 'dashboards list', 'logs list')", required=True)
+                Arg(name="command", description="The command to pass to dog (e.g., 'monitor list', 'metric post', 'event post')", required=True)
             ],
-            image="datadog/cli:latest"
+            image="python:3.9-slim"
         )
 
 CLITools() 
