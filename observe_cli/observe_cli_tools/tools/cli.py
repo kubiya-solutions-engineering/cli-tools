@@ -650,7 +650,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             fi
             """,
             args=[
-                Arg(name="command", description="The command to execute (e.g., 'datasets list', 'monitors show <id>', 'query <dataset-id> <oql-query>', 'api GET /v1/dataset')", required=True)
+                Arg(name="command", description="The command to execute (e.g., 'dataset list', 'monitors show <id>', 'query <dataset-id> <oql-query>', 'api GET /v1/dataset')", required=True)
             ],
             image="alpine:latest"
         )
