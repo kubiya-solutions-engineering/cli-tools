@@ -30,10 +30,15 @@ class CLITools:
             name="observe_cli_command",
             description="Execute any Observe CLI command",
             content="""
-            # Install curl if not available
+            # Install curl and tar if not available
             if ! command -v curl &> /dev/null; then
                 echo "Installing curl..."
                 apk add --no-cache curl
+            fi
+            
+            if ! command -v tar &> /dev/null; then
+                echo "Installing tar..."
+                apk add --no-cache tar
             fi
             
             # Detect platform and architecture
@@ -55,15 +60,36 @@ class CLITools:
                 # Create directory if it doesn't exist
                 mkdir -p /usr/local/bin
                 
-                # Download the appropriate version
-                DOWNLOAD_URL="https://github.com/observeinc/cli/releases/latest/download/observe-cli-$OS-$ARCH"
-                echo "Downloading from: $DOWNLOAD_URL"
-                
-                if curl -L "$DOWNLOAD_URL" -o /usr/local/bin/observe; then
-                    chmod +x /usr/local/bin/observe
-                    echo "✅ Observe CLI installed successfully"
+                # Use the correct release format
+                VERSION="0.3.0-rc1"
+                if [ "$OS" = "linux" ]; then
+                    DOWNLOAD_URL="https://github.com/observeinc/observe/releases/download/v$VERSION/observe_${VERSION}_${OS}_${ARCH}.tar.gz"
+                    echo "Downloading from: $DOWNLOAD_URL"
+                    
+                    if curl -L "$DOWNLOAD_URL" -o /tmp/observe.tar.gz; then
+                        tar -xzf /tmp/observe.tar.gz -C /usr/local/bin/
+                        chmod +x /usr/local/bin/observe
+                        rm /tmp/observe.tar.gz
+                        echo "✅ Observe CLI installed successfully"
+                    else
+                        echo "❌ Failed to download Observe CLI"
+                        exit 1
+                    fi
+                elif [ "$OS" = "darwin" ]; then
+                    DOWNLOAD_URL="https://github.com/observeinc/observe/releases/download/v$VERSION/observe_${VERSION}_${OS}_${ARCH}.zip"
+                    echo "Downloading from: $DOWNLOAD_URL"
+                    
+                    if curl -L "$DOWNLOAD_URL" -o /tmp/observe.zip; then
+                        unzip -o /tmp/observe.zip -d /usr/local/bin/
+                        chmod +x /usr/local/bin/observe
+                        rm /tmp/observe.zip
+                        echo "✅ Observe CLI installed successfully"
+                    else
+                        echo "❌ Failed to download Observe CLI"
+                        exit 1
+                    fi
                 else
-                    echo "❌ Failed to download Observe CLI"
+                    echo "❌ Unsupported operating system: $OS"
                     exit 1
                 fi
             else
