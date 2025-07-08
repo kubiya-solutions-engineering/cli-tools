@@ -690,32 +690,14 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             args=[
                 Arg(name="command", description="""The command to execute. Examples:
 
-Basic Operations:
-- 'dataset list' - List all datasets
-- 'dataset show <dataset-id>' - Show dataset details
-- 'monitors list' - List all monitors  
-- 'monitors show <monitor-id>' - Show monitor details
-- 'monitor-mute-rules list' - List all monitor mute rules
-- 'monitor-mute-rules show <mute-rule-id>' - Show mute rule details
-- 'referencetables list' - List all reference tables
-- 'referencetables show <table-id>' - Show reference table details
+Basic: 'dataset list', 'dataset show <id>', 'monitors list', 'monitors show <id>'
+Query: 'query <dataset-id> <opal-query>', 'advanced-query <dataset-id> [options]'
+API: 'api <method> <endpoint> [query-params] [body]'
 
-Query Operations:
-- 'query <dataset-id> <opal-query>' - Execute OPAL query on dataset
-- 'advanced-query <dataset-id> --startTime 2023-04-20T16:20:00Z --endTime 2023-04-20T16:30:00Z' - Query with time range
-- 'advanced-query <dataset-id> --interval 1h --opal "filter severity == \\"error\\""' - Query with interval and filter
-
-Custom API Calls:
-- 'api GET /v1/dataset' - Get all datasets
-- 'api GET /v1/monitors' - Get all monitors
-- 'api POST /v1/monitors' - Create a monitor (with body)
-- 'api GET /v1/dataset/{id}' - Get specific dataset
-
-OPAL Query Examples:
-- 'query <dataset-id> "filter severity == \\"error\\""' - Filter by severity
-- 'query <dataset-id> "filter timestamp > \\"2023-01-01T00:00:00Z\\""' - Filter by timestamp
-- 'query <dataset-id> "make count()"' - Count records
-- 'query <dataset-id> "filter message =~ \\"error\\" | make count()"' - Filter and count""", required=True)
+OPAL Examples:
+- 'query <dataset-id> "filter severity == \\"error\\""'
+- 'query <dataset-id> "make count()"'
+- 'query <dataset-id> "filter message =~ \\"error\\" | make count()"'""", required=True)
             ],
             image="alpine:latest"
         )
