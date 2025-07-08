@@ -28,7 +28,14 @@ class CLITools:
         """Execute any Observe API operation with dynamic parameters."""
         return ObserveCLITool(
             name="observe_api_command",
-            description="Execute any Observe API operation with dynamic parameters and proper response parsing",
+            description="""
+Execute any Observe API operation with dynamic parameters and proper response parsing. 
+
+- Only supported API endpoints/methods are allowed (validated against the Observe OpenAPI spec).
+- If you use an invalid endpoint or method, you'll get a clear error and a hint on the correct one.
+- Large responses are truncated (100 lines or 10,000 characters max) for usability. Use filters or pagination for more data.
+- For custom API calls, use: api <METHOD> <ENDPOINT> [query-params] [body]
+""",
             content="""
             # Set up authentication and validation
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -99,35 +106,57 @@ class CLITools:
                 echo "$params"
             }
             
+            # Static list of valid endpoints and methods (from OpenAPI spec)
+            VALID_ENDPOINTS="/v1/login POST /v1/login/delegated POST /v1/login/delegated/{serverToken} GET /v1/meta/export/query POST /v1/meta/export/query/page GET /v1/meta/export/worksheet/{worksheetId} POST /v1/meta/reftable GET /v1/meta/reftable POST /v1/meta/reftable/{id} GET /v1/meta/reftable/{id} PUT /v1/meta/reftable/{id} DELETE /v1/dataset GET /v1/dataset/{id} GET /v1/monitors GET /v1/monitors POST /v1/monitors/{id} GET /v1/monitors/{id} PATCH /v1/monitors/{id} DELETE /v1/monitor-mute-rules GET /v1/monitor-mute-rules POST /v1/monitor-mute-rules/{id} GET /v1/monitor-mute-rules/{id} DELETE /v1/referencetables GET /v1/referencetables POST /v1/referencetables/{id} GET /v1/referencetables/{id} PATCH /v1/referencetables/{id} DELETE /v1/referencetables/{id} PUT"
+
+            # Helper to print valid endpoints/methods
+            print_valid_endpoints() {
+                echo "\nSupported API endpoints and methods (from Observe OpenAPI):"
+                echo "$VALID_ENDPOINTS" | tr ' ' '\n' | paste - -
+            }
+
+            # Helper to check if endpoint/method is valid
+            is_valid_api() {
+                local method="$1"
+                local endpoint="$2"
+                # Remove query params for validation
+                endpoint="$(echo "$endpoint" | cut -d'?' -f1)"
+                # Replace numeric path params with {id} for matching
+                endpoint="$(echo "$endpoint" | sed -E 's/[0-9]+|[a-f0-9\-]{8,}/{id}/g')"
+                # Check for match
+                if echo "$VALID_ENDPOINTS" | grep -q "${endpoint} ${method}"; then
+                    return 0
+                else
+                    return 1
+                fi
+            }
+            
             # Parse the command to determine operation type
             if [ -z "$command" ]; then
                 echo "Error: Command is required"
                 echo "Usage examples:"
-                echo "  'datasets list' - List all datasets"
-                echo "  'datasets show <dataset-id>' - Show dataset details"
+                echo "  'dataset list' - List all datasets"
+                echo "  'dataset show <dataset-id>' - Show dataset details"
                 echo "  'monitors list' - List all monitors"
                 echo "  'monitors show <monitor-id>' - Show monitor details"
-                echo "  'dashboards list' - List all dashboards"
-                echo "  'resources list' - List all resources"
-                echo "  'events list' - List all events"
-                echo "  'query <dataset-id> <oql-query>' - Execute OQL query"
+                echo "  'monitor-mute-rules list' - List all monitor mute rules"
+                echo "  'monitor-mute-rules show <mute-rule-id>' - Show monitor mute rule details"
+                echo "  'referencetables list' - List all reference tables"
+                echo "  'referencetables show <table-id>' - Show reference table details"
+                echo "  'query <dataset-id> <opal-query>' - Execute OPAL query"
                 echo "  'api <method> <endpoint> [query-params] [body]' - Custom API call"
                 echo "  'advanced-query <dataset-id> [options]' - Advanced query with filters and parameters"
                 echo ""
                 echo "Advanced URL Parameters:"
-                echo "  Time ranges: time-start, time-end, time-preset"
+                echo "  Time ranges: startTime, endTime, interval"
                 echo "  Filters: filter-<column>=<value>, filter=<column>|<operator>|<value>"
                 echo "  OPAL: opal=<opal-statement>"
                 echo "  Parameters: param-<key>=<value>"
-                echo "  Tabs: v-tab=<tab-name>"
-                echo "  Dashboard: v-dash=<dashboard-id>"
                 echo ""
                 echo "Advanced Query Examples:"
-                echo "  advanced-query dataset-123 --time-preset PAST_1_HOUR"
-                echo "  advanced-query dataset-123 --filter-eq status error"
-                echo "  advanced-query dataset-123 --filter severity != warning"
-                echo "  advanced-query dataset-123 --opal 'filter severity == \"error\"'"
-                echo "  advanced-query dataset-123 --time-start 1686165391864 --time-end 1686251791864"
+                echo "  advanced-query 41007104 --interval 1h"
+                echo "  advanced-query 41007104 --startTime 2023-04-20T16:20:00Z --endTime 2023-04-20T16:30:00Z"
+                echo "  advanced-query 41007104 --opal 'filter severity == \"error\"'"
                 exit 1
             fi
             
@@ -145,23 +174,23 @@ class CLITools:
             
             # Handle different operation types
             case "$OPERATION" in
-                "datasets")
+                "dataset")
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing datasets..."
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/datasets")
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dataset")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
-                                echo "Error: Dataset ID is required for 'datasets show'"
+                                echo "Error: Dataset ID is required for 'dataset show'"
                                 exit 1
                             fi
                             dataset_id="$3"
                             echo "Showing dataset: $dataset_id"
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/datasets/$dataset_id")
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dataset/$dataset_id")
                             ;;
                         *)
-                            echo "Error: Unknown datasets operation: $SUB_OPERATION"
+                            echo "Error: Unknown dataset operation: $SUB_OPERATION"
                             echo "Supported: list, show"
                             exit 1
                             ;;
@@ -171,7 +200,7 @@ class CLITools:
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitors..."
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors")
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
@@ -180,7 +209,7 @@ class CLITools:
                             fi
                             monitor_id="$3"
                             echo "Showing monitor: $monitor_id"
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors/$monitor_id")
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors/$monitor_id")
                             ;;
                         *)
                             echo "Error: Unknown monitors operation: $SUB_OPERATION"
@@ -189,67 +218,45 @@ class CLITools:
                             ;;
                     esac
                     ;;
-                "dashboards")
+                "monitor-mute-rules")
                     case "$SUB_OPERATION" in
                         "list")
-                            echo "Listing dashboards..."
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dashboards")
+                            echo "Listing monitor mute rules..."
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitor-mute-rules")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
-                                echo "Error: Dashboard ID is required for 'dashboards show'"
+                                echo "Error: Mute Rule ID is required for 'monitor-mute-rules show'"
                                 exit 1
                             fi
-                            dashboard_id="$3"
-                            echo "Showing dashboard: $dashboard_id"
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dashboards/$dashboard_id")
+                            mute_rule_id="$3"
+                            echo "Showing monitor mute rule: $mute_rule_id"
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id")
                             ;;
                         *)
-                            echo "Error: Unknown dashboards operation: $SUB_OPERATION"
+                            echo "Error: Unknown monitor-mute-rules operation: $SUB_OPERATION"
                             echo "Supported: list, show"
                             exit 1
                             ;;
                     esac
                     ;;
-                "resources")
+                "referencetables")
                     case "$SUB_OPERATION" in
                         "list")
-                            echo "Listing resources..."
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/resources")
+                            echo "Listing reference tables..."
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/referencetables")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
-                                echo "Error: Resource ID is required for 'resources show'"
+                                echo "Error: Reference Table ID is required for 'referencetables show'"
                                 exit 1
                             fi
-                            resource_id="$3"
-                            echo "Showing resource: $resource_id"
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/resources/$resource_id")
+                            table_id="$3"
+                            echo "Showing reference table: $table_id"
+                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/referencetables/$table_id")
                             ;;
                         *)
-                            echo "Error: Unknown resources operation: $SUB_OPERATION"
-                            echo "Supported: list, show"
-                            exit 1
-                            ;;
-                    esac
-                    ;;
-                "events")
-                    case "$SUB_OPERATION" in
-                        "list")
-                            echo "Listing events..."
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/events")
-                            ;;
-                        "show")
-                            if [ -z "$3" ]; then
-                                echo "Error: Event ID is required for 'events show'"
-                                exit 1
-                            fi
-                            event_id="$3"
-                            echo "Showing event: $event_id"
-                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/events/$event_id")
-                            ;;
-                        *)
-                            echo "Error: Unknown events operation: $SUB_OPERATION"
+                            echo "Error: Unknown referencetables operation: $SUB_OPERATION"
                             echo "Supported: list, show"
                             exit 1
                             ;;
@@ -257,63 +264,18 @@ class CLITools:
                     ;;
                 "query")
                     if [ -z "$2" ] || [ -z "$3" ]; then
-                        echo "Error: Query requires dataset ID and OQL query"
-                        echo "Usage: query <dataset-id> <oql-query>"
+                        echo "Error: Query requires dataset ID and OPAL query"
+                        echo "Usage: query <dataset-id> <opal-query>"
                         exit 1
                     fi
                     dataset_id="$2"
-                    # Get all remaining arguments as the query
                     shift 2
-                    query="$*"
-                    echo "Executing query on dataset: $dataset_id"
-                    echo "Query: $query"
-                    
-                    # Prepare query payload
-                    QUERY_PAYLOAD='{"query": "'$query'", "dataset": "'$dataset_id'"}'
-                    response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$OBSERVE_BASE_URL/v1/query")
-                    ;;
-                "api")
-                    if [ -z "$2" ] || [ -z "$3" ]; then
-                        echo "Error: API call requires method and endpoint"
-                        echo "Usage: api <method> <endpoint> [query-params] [body]"
-                        exit 1
-                    fi
-                    method="$2"
-                    endpoint="$3"
-                    query_params="$4"
-                    body="$5"
-                    
-                    echo "Making API call: $method $endpoint"
-                    
-                    # Build URL with query parameters
-                    full_url="$OBSERVE_BASE_URL$endpoint"
-                    if [ -n "$query_params" ]; then
-                        full_url="$full_url?$query_params"
-                    fi
-                    
-                    # Build curl command
-                    CURL_CMD="curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS"
-                    case "$method" in
-                        GET)
-                            CURL_CMD="$CURL_CMD '$full_url'"
-                            ;;
-                        POST|PUT|PATCH)
-                            if [ -n "$body" ]; then
-                                CURL_CMD="$CURL_CMD -X $method -d '$body' '$full_url'"
-                            else
-                                CURL_CMD="$CURL_CMD -X $method '$full_url'"
-                            fi
-                            ;;
-                        DELETE)
-                            CURL_CMD="$CURL_CMD -X DELETE '$full_url'"
-                            ;;
-                        *)
-                            echo "Error: Unsupported HTTP method: $method"
-                            exit 1
-                            ;;
-                    esac
-                    
-                    response=$(eval $CURL_CMD)
+                    opal_query="$*"
+                    echo "Executing OPAL query on dataset: $dataset_id"
+                    echo "Query: $opal_query"
+                    # Prepare OPAL query payload
+                    QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$dataset_id'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
+                    response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$OBSERVE_BASE_URL/v1/meta/export/query")
                     ;;
                 "advanced-query")
                     if [ -z "$2" ]; then
@@ -321,68 +283,36 @@ class CLITools:
                         echo "Usage: advanced-query <dataset-id> [options]"
                         echo ""
                         echo "Options:"
-                        echo "  --time-start <timestamp>     Start time (Unix epoch or ISO 8601)"
-                        echo "  --time-end <timestamp>       End time (Unix epoch or ISO 8601)"
-                        echo "  --time-preset <preset>       Time preset (TODAY, YESTERDAY, etc.)"
-                        echo "  --filter <column> <operator> <value>  Filter with operator"
-                        echo "  --filter-eq <column> <value> Filter with equals"
-                        echo "  --opal <opal-statement>      OPAL statement"
-                        echo "  --param <key> <value>        Parameter"
-                        echo "  --tab <tab-name>             Tab selection"
-                        echo "  --dash <dashboard-id>        Dashboard selection"
+                        echo "  --startTime <ISO8601>         Start time (e.g. 2023-04-20T16:20:00Z)"
+                        echo "  --endTime <ISO8601>           End time (e.g. 2023-04-20T16:30:00Z)"
+                        echo "  --interval <duration>         Interval (e.g. 1h, 10m)"
+                        echo "  --opal <opal-statement>       OPAL statement"
                         echo ""
                         echo "Examples:"
-                        echo "  advanced-query dataset-123 --time-preset PAST_1_HOUR"
-                        echo "  advanced-query dataset-123 --filter-eq status error"
-                        echo "  advanced-query dataset-123 --filter severity != warning"
-                        echo "  advanced-query dataset-123 --opal 'filter severity == \"error\"'"
+                        echo "  advanced-query 41007104 --interval 1h"
+                        echo "  advanced-query 41007104 --startTime 2023-04-20T16:20:00Z --endTime 2023-04-20T16:30:00Z"
+                        echo "  advanced-query 41007104 --opal 'filter severity == \"error\"'"
                         exit 1
                     fi
-                    
                     dataset_id="$2"
                     shift 2
-                    
                     # Parse advanced options
                     while [ $# -gt 0 ]; do
                         case "$1" in
-                            --time-start)
-                                time_start="$2"
+                            --startTime)
+                                startTime="$2"
                                 shift 2
                                 ;;
-                            --time-end)
-                                time_end="$2"
+                            --endTime)
+                                endTime="$2"
                                 shift 2
                                 ;;
-                            --time-preset)
-                                time_preset="$2"
+                            --interval)
+                                interval="$2"
                                 shift 2
-                                ;;
-                            --filter)
-                                filter_column="$2"
-                                filter_operator="$3"
-                                filter_value="$4"
-                                shift 4
-                                ;;
-                            --filter-eq)
-                                filter_column="$2"
-                                filter_value="$3"
-                                shift 3
                                 ;;
                             --opal)
                                 opal="$2"
-                                shift 2
-                                ;;
-                            --param)
-                                param_key="$2"
-                                param_value="$3"
-                                shift 3
-                                ;;
-                            --tab)
-                                v_tab="$2"
-                                shift 2
-                                ;;
-                            --dash)
-                                v_dash="$2"
                                 shift 2
                                 ;;
                             *)
@@ -391,28 +321,21 @@ class CLITools:
                                 ;;
                         esac
                     done
-                    
-                    echo "Executing advanced query on dataset: $dataset_id"
-                    
-                    # Build query parameters
-                    query_params=$(build_query_params)
-                    
-                    # Build the URL
-                    full_url="$OBSERVE_BASE_URL/v1/datasets/$dataset_id"
-                    if [ -n "$query_params" ]; then
-                        full_url="$full_url?$query_params"
-                        echo "Query parameters: $query_params"
-                    fi
-                    
-                    echo "Full URL: $full_url"
-                    echo ""
-                    
-                    # Execute the query
-                    response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$full_url")
+                    # Build query payload
+                    QUERY_PAYLOAD="{\"query\": {\"stages\": [{\"input\": [{\"datasetId\": \"$dataset_id\"}], \"stageID\": \"main\", \"pipeline\": \"$opal\"}]}}"
+                    # Build query params
+                    query_params=""
+                    [ -n "$startTime" ] && query_params="${query_params}startTime=$startTime&"
+                    [ -n "$endTime" ] && query_params="${query_params}endTime=$endTime&"
+                    [ -n "$interval" ] && query_params="${query_params}interval=$interval&"
+                    query_params=$(echo "$query_params" | sed 's/&$//')
+                    full_url="$OBSERVE_BASE_URL/v1/meta/export/query"
+                    [ -n "$query_params" ] && full_url="$full_url?$query_params"
+                    response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$full_url")
                     ;;
                 *)
                     echo "Error: Unknown operation: $OPERATION"
-                    echo "Supported operations: datasets, monitors, dashboards, resources, events, query, api, advanced-query"
+                    echo "Supported operations: dataset, monitors, monitor-mute-rules, referencetables, query, api, advanced-query"
                     exit 1
                     ;;
             esac
@@ -873,6 +796,20 @@ class CLITools:
             fi
             echo ""
             
+            # Truncate output if too large
+            MAX_LINES=100
+            MAX_CHARS=10000
+            num_lines=$(echo "$response_body" | wc -l | tr -d ' ')
+            num_chars=$(echo "$response_body" | wc -c | tr -d ' ')
+            if [ "$num_lines" -gt "$MAX_LINES" ]; then
+                echo "⚠️  Output truncated to $MAX_LINES lines. Refine your query or use filters for more data."
+                response_body=$(echo "$response_body" | head -n $MAX_LINES)
+            fi
+            if [ "$num_chars" -gt "$MAX_CHARS" ]; then
+                echo "⚠️  Output truncated to $MAX_CHARS characters. Refine your query or use filters for more data."
+                response_body=$(echo "$response_body" | head -c $MAX_CHARS)
+            fi
+            
             # Try to format JSON response, fallback to raw if not JSON
             if command -v jq >/dev/null 2>&1; then
                 echo "$response_body" | jq '.' 2>/dev/null || echo "$response_body"
@@ -881,7 +818,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="command", description="The command to execute (e.g., 'datasets list', 'monitors show <id>', 'query <dataset-id> <oql-query>', 'api GET /v1/datasets')", required=True)
+                Arg(name="command", description="The command to execute (e.g., 'datasets list', 'monitors show <id>', 'query <dataset-id> <oql-query>', 'api GET /v1/dataset')", required=True)
             ],
             image="alpine:latest"
         )
