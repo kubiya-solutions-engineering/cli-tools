@@ -1,6 +1,5 @@
 import sys
-import os
-from .base import DatadogCLITool, Arg, FileSpec
+from .base import DatadogCLITool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 
 class CLITools:
@@ -26,26 +25,6 @@ class CLITools:
 
     def run_cli_command(self) -> DatadogCLITool:
         """Execute any Datadog CLI command."""
-        
-        # Create the .dogrc configuration file content
-        dogrc_content = """[Connection]
-apikey = ${DD_API_KEY}
-appkey = ${DD_APP_KEY}
-api_host = https://api.${DD_SITE}
-"""
-        
-        # Write the .dogrc file to a temporary location
-        dogrc_path = "/tmp/.dogrc"
-        with open(dogrc_path, "w") as f:
-            f.write(dogrc_content)
-        
-        # Define file specifications
-        file_specs = [
-            FileSpec(
-                source=dogrc_path,
-                destination="/root/.dogrc"
-            )
-        ]
         
         return DatadogCLITool(
             name="datadog_cli_command",
@@ -73,39 +52,6 @@ api_host = https://api.${DD_SITE}
                 echo "  • tag list              - List tags"
                 echo "  • search                - Search metrics/events"
                 echo "  • comment post          - Post a comment"
-                exit 1
-            fi
-            
-            # Validate authentication environment variables
-            if [ -z "$DD_API_KEY" ]; then
-                echo "❌ Error: DD_API_KEY environment variable is not set"
-                echo ""
-                echo "💡 Hint: Set your Datadog API key:"
-                echo "  export DD_API_KEY='your-api-key-here'"
-                echo ""
-                echo "You can find your API key in Datadog:"
-                echo "  Settings → API Keys → Create API Key"
-                exit 1
-            fi
-            
-            if [ -z "$DD_APP_KEY" ]; then
-                echo "❌ Error: DD_APP_KEY environment variable is not set"
-                echo ""
-                echo "💡 Hint: Set your Datadog Application key:"
-                echo "  export DD_APP_KEY='your-app-key-here'"
-                echo ""
-                echo "You can find your Application key in Datadog:"
-                echo "  Settings → Application Keys → Create Application Key"
-                exit 1
-            fi
-            
-            if [ -z "$DD_SITE" ]; then
-                echo "❌ Error: DD_SITE environment variable is not set"
-                echo ""
-                echo "💡 Hint: Set your Datadog site:"
-                echo "  export DD_SITE='datadoghq.com'  # US site"
-                echo "  export DD_SITE='datadoghq.eu'   # EU site"
-                echo "  export DD_SITE='us3.datadoghq.com'  # US3 site"
                 exit 1
             fi
             
@@ -185,8 +131,7 @@ api_host = https://api.${DD_SITE}
             args=[
                 Arg(name="command", description="The command to pass to dog (e.g., 'monitor list', 'metric post', 'event post')", required=True)
             ],
-            image="python:3.9-slim",
-            with_files=file_specs
+            image="python:3.9-slim"
         )
 
 CLITools() 
