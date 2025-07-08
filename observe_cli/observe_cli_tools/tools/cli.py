@@ -64,9 +64,9 @@ class CLITools:
             fi
             
             # Split command into parts
-            IFS=' ' read -ra CMD_PARTS <<< "$command"
-            OPERATION="${CMD_PARTS[0]}"
-            SUB_OPERATION="${CMD_PARTS[1]}"
+            set -- $command
+            OPERATION="$1"
+            SUB_OPERATION="$2"
             
             echo "=== Observe API Operation ==="
             echo "Command: $command"
@@ -84,11 +84,11 @@ class CLITools:
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/datasets")
                             ;;
                         "show")
-                            if [ -z "${CMD_PARTS[2]}" ]; then
+                            if [ -z "$3" ]; then
                                 echo "Error: Dataset ID is required for 'datasets show'"
                                 exit 1
                             fi
-                            dataset_id="${CMD_PARTS[2]}"
+                            dataset_id="$3"
                             echo "Showing dataset: $dataset_id"
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/datasets/$dataset_id")
                             ;;
@@ -106,11 +106,11 @@ class CLITools:
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors")
                             ;;
                         "show")
-                            if [ -z "${CMD_PARTS[2]}" ]; then
+                            if [ -z "$3" ]; then
                                 echo "Error: Monitor ID is required for 'monitors show'"
                                 exit 1
                             fi
-                            monitor_id="${CMD_PARTS[2]}"
+                            monitor_id="$3"
                             echo "Showing monitor: $monitor_id"
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors/$monitor_id")
                             ;;
@@ -128,11 +128,11 @@ class CLITools:
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dashboards")
                             ;;
                         "show")
-                            if [ -z "${CMD_PARTS[2]}" ]; then
+                            if [ -z "$3" ]; then
                                 echo "Error: Dashboard ID is required for 'dashboards show'"
                                 exit 1
                             fi
-                            dashboard_id="${CMD_PARTS[2]}"
+                            dashboard_id="$3"
                             echo "Showing dashboard: $dashboard_id"
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dashboards/$dashboard_id")
                             ;;
@@ -150,11 +150,11 @@ class CLITools:
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/resources")
                             ;;
                         "show")
-                            if [ -z "${CMD_PARTS[2]}" ]; then
+                            if [ -z "$3" ]; then
                                 echo "Error: Resource ID is required for 'resources show'"
                                 exit 1
                             fi
-                            resource_id="${CMD_PARTS[2]}"
+                            resource_id="$3"
                             echo "Showing resource: $resource_id"
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/resources/$resource_id")
                             ;;
@@ -172,11 +172,11 @@ class CLITools:
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/events")
                             ;;
                         "show")
-                            if [ -z "${CMD_PARTS[2]}" ]; then
+                            if [ -z "$3" ]; then
                                 echo "Error: Event ID is required for 'events show'"
                                 exit 1
                             fi
-                            event_id="${CMD_PARTS[2]}"
+                            event_id="$3"
                             echo "Showing event: $event_id"
                             response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/events/$event_id")
                             ;;
@@ -188,14 +188,15 @@ class CLITools:
                     esac
                     ;;
                 "query")
-                    if [ -z "${CMD_PARTS[1]}" ] || [ -z "${CMD_PARTS[2]}" ]; then
+                    if [ -z "$2" ] || [ -z "$3" ]; then
                         echo "Error: Query requires dataset ID and OQL query"
                         echo "Usage: query <dataset-id> <oql-query>"
                         exit 1
                     fi
-                    dataset_id="${CMD_PARTS[1]}"
-                    # Join remaining parts as the query
-                    query="${CMD_PARTS[@]:2}"
+                    dataset_id="$2"
+                    # Get all remaining arguments as the query
+                    shift 2
+                    query="$*"
                     echo "Executing query on dataset: $dataset_id"
                     echo "Query: $query"
                     
@@ -204,15 +205,15 @@ class CLITools:
                     response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$OBSERVE_BASE_URL/v1/query")
                     ;;
                 "api")
-                    if [ -z "${CMD_PARTS[1]}" ] || [ -z "${CMD_PARTS[2]}" ]; then
+                    if [ -z "$2" ] || [ -z "$3" ]; then
                         echo "Error: API call requires method and endpoint"
                         echo "Usage: api <method> <endpoint> [query-params] [body]"
                         exit 1
                     fi
-                    method="${CMD_PARTS[1]}"
-                    endpoint="${CMD_PARTS[2]}"
-                    query_params="${CMD_PARTS[3]}"
-                    body="${CMD_PARTS[4]}"
+                    method="$2"
+                    endpoint="$3"
+                    query_params="$4"
+                    body="$5"
                     
                     echo "Making API call: $method $endpoint"
                     
