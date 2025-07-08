@@ -473,14 +473,6 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                 
                 echo "✅ Bearer token format: Bearer $OBSERVE_CUSTOMER_ID <token>"
                 
-                # Try a simple connectivity test
-                echo "=== Connectivity Test ==="
-                if curl -s --connect-timeout 10 --max-time 30 "$OBSERVE_BASE_URL" >/dev/null 2>&1; then
-                    echo "✅ Base URL is reachable"
-                else
-                    echo "❌ Cannot reach base URL - check network connectivity"
-                fi
-                
                 exit 1
             fi
             
