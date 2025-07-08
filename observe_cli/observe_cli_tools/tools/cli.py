@@ -4,13 +4,13 @@ from .base import ObserveCLITool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 
 class CLITools:
-    """Observe CLI wrapper tools."""
+    """Observe API wrapper tools using curl instead of CLI."""
 
     def __init__(self):
-        """Initialize and register all Observe CLI tools."""
+        """Initialize and register all Observe API wrapper tools."""
         try:
             tools = [
-                self.run_cli_command()
+                self.run_api_command()
             ]
             
             for tool in tools:
@@ -21,133 +21,275 @@ class CLITools:
                     print(f"❌ Failed to register {tool.name}: {str(e)}", file=sys.stderr)
                     raise
         except Exception as e:
-            print(f"❌ Failed to register Observe CLI tools: {str(e)}", file=sys.stderr)
+            print(f"❌ Failed to register Observe API wrapper tools: {str(e)}", file=sys.stderr)
             raise
 
-    def run_cli_command(self) -> ObserveCLITool:
-        """Execute an Observe CLI command."""
+    def run_api_command(self) -> ObserveCLITool:
+        """Execute any Observe API operation with dynamic parameters."""
         return ObserveCLITool(
-            name="observe_cli_command",
-            description="Execute any Observe CLI command",
+            name="observe_api_command",
+            description="Execute any Observe API operation with dynamic parameters and proper response parsing",
             content="""
-            # Install curl and tar if not available
-            if ! command -v curl &> /dev/null; then
-                echo "Installing curl..."
-                apk add --no-cache curl
-            fi
-            
-            if ! command -v tar &> /dev/null; then
-                echo "Installing tar..."
-                apk add --no-cache tar
-            fi
-            
-            # Detect platform and architecture
-            OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-            ARCH=$(uname -m)
-            
-            # Map architecture to Observe CLI format
-            case $ARCH in
-                x86_64) ARCH="amd64" ;;
-                arm64) ARCH="arm64" ;;
-                aarch64) ARCH="arm64" ;;
-                *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-            esac
-            
-            # Install observe CLI if not present
-            if ! command -v observe &> /dev/null; then
-                echo "Installing Observe CLI for $OS-$ARCH..."
-                
-                # Create directory if it doesn't exist
-                mkdir -p /usr/local/bin
-                
-                # Use the correct release format
-                VERSION="0.3.0-rc1"
-                if [ "$OS" = "linux" ]; then
-                    DOWNLOAD_URL="https://github.com/observeinc/observe/releases/download/v$VERSION/observe_${VERSION}_${OS}_${ARCH}.tar.gz"
-                    echo "Downloading from: $DOWNLOAD_URL"
-                    
-                    if curl -L "$DOWNLOAD_URL" -o /tmp/observe.tar.gz; then
-                        echo "Download successful. Extracting..."
-                        tar -tzf /tmp/observe.tar.gz
-                        tar -xzf /tmp/observe.tar.gz -C /tmp/
-                        ls -la /tmp/
-                        if [ -f /tmp/observe ]; then
-                            mv /tmp/observe /usr/local/bin/
-                            chmod +x /usr/local/bin/observe
-                            echo "✅ Observe CLI installed successfully"
-                        elif [ -f /tmp/observe_${VERSION}_${OS}_${ARCH}/observe ]; then
-                            mv /tmp/observe_${VERSION}_${OS}_${ARCH}/observe /usr/local/bin/
-                            chmod +x /usr/local/bin/observe
-                            echo "✅ Observe CLI installed successfully"
-                        else
-                            echo "❌ Observe binary not found in extracted files"
-                            find /tmp -name "observe" -type f
-                            exit 1
-                        fi
-                        rm /tmp/observe.tar.gz
-                    else
-                        echo "❌ Failed to download Observe CLI"
-                        exit 1
-                    fi
-                elif [ "$OS" = "darwin" ]; then
-                    DOWNLOAD_URL="https://github.com/observeinc/observe/releases/download/v$VERSION/observe_${VERSION}_${OS}_${ARCH}.zip"
-                    echo "Downloading from: $DOWNLOAD_URL"
-                    
-                    if curl -L "$DOWNLOAD_URL" -o /tmp/observe.zip; then
-                        unzip -o /tmp/observe.zip -d /tmp/
-                        if [ -f /tmp/observe ]; then
-                            mv /tmp/observe /usr/local/bin/
-                            chmod +x /usr/local/bin/observe
-                            echo "✅ Observe CLI installed successfully"
-                        else
-                            echo "❌ Observe binary not found in extracted files"
-                            exit 1
-                        fi
-                        rm /tmp/observe.zip
-                    else
-                        echo "❌ Failed to download Observe CLI"
-                        exit 1
-                    fi
-                else
-                    echo "❌ Unsupported operating system: $OS"
-                    exit 1
-                fi
-            else
-                echo "✅ Observe CLI already installed"
-            fi
-            
-            # Validate required parameters
-            if [ -z "$command" ]; then
-                echo "Error: Command is required"
+            # Set up authentication and validation
+            if [ -z "$OBSERVE_API_KEY" ]; then
+                echo "Error: OBSERVE_API_KEY environment variable is required"
                 exit 1
             fi
             
-            # Set up authentication if environment variables are available
-            AUTH_PARAMS=""
-            if [ -n "$OBSERVE_CUSTOMER_ID" ]; then
-                AUTH_PARAMS="$AUTH_PARAMS --customerid $OBSERVE_CUSTOMER_ID"
+            if [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+                echo "Error: OBSERVE_CUSTOMER_ID environment variable is required"
+                exit 1
             fi
             
-            if [ -n "$OBSERVE_API_KEY" ]; then
-                AUTH_PARAMS="$AUTH_PARAMS --authtoken $OBSERVE_API_KEY"
+            # Set base URL
+            OBSERVE_BASE_URL="https://$OBSERVE_CUSTOMER_ID.collect.observeinc.com"
+            
+            # Set default headers
+            HEADERS="-H 'Authorization: Bearer $OBSERVE_API_KEY' -H 'Content-Type: application/json'"
+            
+            # Parse the command to determine operation type
+            if [ -z "$command" ]; then
+                echo "Error: Command is required"
+                echo "Usage examples:"
+                echo "  'datasets list' - List all datasets"
+                echo "  'datasets show <dataset-id>' - Show dataset details"
+                echo "  'monitors list' - List all monitors"
+                echo "  'monitors show <monitor-id>' - Show monitor details"
+                echo "  'dashboards list' - List all dashboards"
+                echo "  'resources list' - List all resources"
+                echo "  'events list' - List all events"
+                echo "  'query <dataset-id> <oql-query>' - Execute OQL query"
+                echo "  'api <method> <endpoint> [query-params] [body]' - Custom API call"
+                exit 1
             fi
             
-            if [ -n "$OBSERVE_SITE" ]; then
-                AUTH_PARAMS="$AUTH_PARAMS --site $OBSERVE_SITE"
-            else
-                # Default to observeinc.com if not specified
-                AUTH_PARAMS="$AUTH_PARAMS --site observeinc.com"
-            fi
+            # Split command into parts
+            IFS=' ' read -ra CMD_PARTS <<< "$command"
+            OPERATION="${CMD_PARTS[0]}"
+            SUB_OPERATION="${CMD_PARTS[1]}"
             
-            echo "=== Executing Observe CLI Command ==="
-            echo "Command: observe $AUTH_PARAMS $command"
+            echo "=== Observe API Operation ==="
+            echo "Command: $command"
+            echo "Operation: $OPERATION"
+            echo "Sub-operation: $SUB_OPERATION"
+            echo "Base URL: $OBSERVE_BASE_URL"
             echo ""
             
-            # Execute the command with authentication parameters
-            observe $AUTH_PARAMS $command
+            # Handle different operation types
+            case "$OPERATION" in
+                "datasets")
+                    case "$SUB_OPERATION" in
+                        "list")
+                            echo "Listing datasets..."
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/datasets")
+                            ;;
+                        "show")
+                            if [ -z "${CMD_PARTS[2]}" ]; then
+                                echo "Error: Dataset ID is required for 'datasets show'"
+                                exit 1
+                            fi
+                            dataset_id="${CMD_PARTS[2]}"
+                            echo "Showing dataset: $dataset_id"
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/datasets/$dataset_id")
+                            ;;
+                        *)
+                            echo "Error: Unknown datasets operation: $SUB_OPERATION"
+                            echo "Supported: list, show"
+                            exit 1
+                            ;;
+                    esac
+                    ;;
+                "monitors")
+                    case "$SUB_OPERATION" in
+                        "list")
+                            echo "Listing monitors..."
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors")
+                            ;;
+                        "show")
+                            if [ -z "${CMD_PARTS[2]}" ]; then
+                                echo "Error: Monitor ID is required for 'monitors show'"
+                                exit 1
+                            fi
+                            monitor_id="${CMD_PARTS[2]}"
+                            echo "Showing monitor: $monitor_id"
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors/$monitor_id")
+                            ;;
+                        *)
+                            echo "Error: Unknown monitors operation: $SUB_OPERATION"
+                            echo "Supported: list, show"
+                            exit 1
+                            ;;
+                    esac
+                    ;;
+                "dashboards")
+                    case "$SUB_OPERATION" in
+                        "list")
+                            echo "Listing dashboards..."
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dashboards")
+                            ;;
+                        "show")
+                            if [ -z "${CMD_PARTS[2]}" ]; then
+                                echo "Error: Dashboard ID is required for 'dashboards show'"
+                                exit 1
+                            fi
+                            dashboard_id="${CMD_PARTS[2]}"
+                            echo "Showing dashboard: $dashboard_id"
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dashboards/$dashboard_id")
+                            ;;
+                        *)
+                            echo "Error: Unknown dashboards operation: $SUB_OPERATION"
+                            echo "Supported: list, show"
+                            exit 1
+                            ;;
+                    esac
+                    ;;
+                "resources")
+                    case "$SUB_OPERATION" in
+                        "list")
+                            echo "Listing resources..."
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/resources")
+                            ;;
+                        "show")
+                            if [ -z "${CMD_PARTS[2]}" ]; then
+                                echo "Error: Resource ID is required for 'resources show'"
+                                exit 1
+                            fi
+                            resource_id="${CMD_PARTS[2]}"
+                            echo "Showing resource: $resource_id"
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/resources/$resource_id")
+                            ;;
+                        *)
+                            echo "Error: Unknown resources operation: $SUB_OPERATION"
+                            echo "Supported: list, show"
+                            exit 1
+                            ;;
+                    esac
+                    ;;
+                "events")
+                    case "$SUB_OPERATION" in
+                        "list")
+                            echo "Listing events..."
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/events")
+                            ;;
+                        "show")
+                            if [ -z "${CMD_PARTS[2]}" ]; then
+                                echo "Error: Event ID is required for 'events show'"
+                                exit 1
+                            fi
+                            event_id="${CMD_PARTS[2]}"
+                            echo "Showing event: $event_id"
+                            response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/events/$event_id")
+                            ;;
+                        *)
+                            echo "Error: Unknown events operation: $SUB_OPERATION"
+                            echo "Supported: list, show"
+                            exit 1
+                            ;;
+                    esac
+                    ;;
+                "query")
+                    if [ -z "${CMD_PARTS[1]}" ] || [ -z "${CMD_PARTS[2]}" ]; then
+                        echo "Error: Query requires dataset ID and OQL query"
+                        echo "Usage: query <dataset-id> <oql-query>"
+                        exit 1
+                    fi
+                    dataset_id="${CMD_PARTS[1]}"
+                    # Join remaining parts as the query
+                    query="${CMD_PARTS[@]:2}"
+                    echo "Executing query on dataset: $dataset_id"
+                    echo "Query: $query"
+                    
+                    # Prepare query payload
+                    QUERY_PAYLOAD='{"query": "'$query'", "dataset": "'$dataset_id'"}'
+                    response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$OBSERVE_BASE_URL/v1/query")
+                    ;;
+                "api")
+                    if [ -z "${CMD_PARTS[1]}" ] || [ -z "${CMD_PARTS[2]}" ]; then
+                        echo "Error: API call requires method and endpoint"
+                        echo "Usage: api <method> <endpoint> [query-params] [body]"
+                        exit 1
+                    fi
+                    method="${CMD_PARTS[1]}"
+                    endpoint="${CMD_PARTS[2]}"
+                    query_params="${CMD_PARTS[3]}"
+                    body="${CMD_PARTS[4]}"
+                    
+                    echo "Making API call: $method $endpoint"
+                    
+                    # Build URL with query parameters
+                    full_url="$OBSERVE_BASE_URL$endpoint"
+                    if [ -n "$query_params" ]; then
+                        full_url="$full_url?$query_params"
+                    fi
+                    
+                    # Build curl command
+                    CURL_CMD="curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS"
+                    case "$method" in
+                        GET)
+                            CURL_CMD="$CURL_CMD '$full_url'"
+                            ;;
+                        POST|PUT|PATCH)
+                            if [ -n "$body" ]; then
+                                CURL_CMD="$CURL_CMD -X $method -d '$body' '$full_url'"
+                            else
+                                CURL_CMD="$CURL_CMD -X $method '$full_url'"
+                            fi
+                            ;;
+                        DELETE)
+                            CURL_CMD="$CURL_CMD -X DELETE '$full_url'"
+                            ;;
+                        *)
+                            echo "Error: Unsupported HTTP method: $method"
+                            exit 1
+                            ;;
+                    esac
+                    
+                    response=$(eval $CURL_CMD)
+                    ;;
+                *)
+                    echo "Error: Unknown operation: $OPERATION"
+                    echo "Supported operations: datasets, monitors, dashboards, resources, events, query, api"
+                    exit 1
+                    ;;
+            esac
+            
+            # Check if curl command was successful
+            if [ $? -ne 0 ]; then
+                echo "Error: Failed to execute API call"
+                exit 1
+            fi
+            
+            # Parse response to separate body and metadata
+            http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d':' -f2)
+            response_time=$(echo "$response" | grep "RESPONSE_TIME:" | cut -d':' -f2)
+            response_body=$(echo "$response" | sed '/HTTP_STATUS:/d' | sed '/RESPONSE_TIME:/d')
+            
+            echo "=== Response ==="
+            echo "HTTP Status: $http_status"
+            echo "Response Time: ${response_time}s"
+            echo ""
+            
+            # Check HTTP status code
+            if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
+                echo "✅ Success ($http_status)"
+            elif [ "$http_status" -ge 400 ] && [ "$http_status" -lt 500 ]; then
+                echo "❌ Client Error ($http_status)"
+            elif [ "$http_status" -ge 500 ]; then
+                echo "❌ Server Error ($http_status)"
+            else
+                echo "⚠️  Unexpected Status ($http_status)"
+            fi
+            echo ""
+            
+            # Try to format JSON response, fallback to raw if not JSON
+            if command -v jq >/dev/null 2>&1; then
+                echo "$response_body" | jq '.' 2>/dev/null || echo "$response_body"
+            else
+                echo "$response_body"
+            fi
             """,
             args=[
-                Arg(name="command", description="The command to pass to the Observe CLI (e.g., 'datasets list', 'monitors list', 'query -q \"pick_col timestamp, log | limit 10\" -i \"Default.kubernetes/Container Logs\"')", required=True)
+                Arg(name="command", description="The command to execute (e.g., 'datasets list', 'monitors show <id>', 'query <dataset-id> <oql-query>', 'api GET /v1/datasets')", required=True)
             ],
             image="alpine:latest"
         )

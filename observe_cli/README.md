@@ -1,27 +1,27 @@
-# <img src="https://cdn.worldvectorlogo.com/logos/observe.svg" width="70" align="center" /> Observe CLI Tools for Kubiya
+# <img src="https://cdn.worldvectorlogo.com/logos/observe.svg" width="70" align="center" /> Observe API Wrapper for Kubiya
 
 <div align="center">
 
-> 🚀 Direct Observe CLI command execution through Kubiya
+> 🚀 Direct Observe API operations through Kubiya using curl
 
 [![Kubiya Platform](https://img.shields.io/badge/Kubiya-Platform-blue?style=for-the-badge&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAADASURBVHgBjZLBDcIwEARPCX/cAakg6YB0QEqgA6ACQgWEDkgHpAPoAFcAJUAFrGYtWbKwlGQ/Zn1n786SyZxzEfYKd4uphSunA1rX7dKAzlWQBqbB+bacc1m4wCtFg1GM4RQKLRQXeKNh4Vz/lWjBHw3X+2KmE0+oB+71M0UR1WOwHvzJ0sDgC9xh0lbOLNbk4kUBJXw8ITPU4N+rR7zQwOKXvNDgvP6GpgbOXIQRX+4ZlX4QBPbBxbpV/FV8ARfDSCg/4aaZAAAAAElFTkSuQmCC)](https://chat.kubiya.ai)
 [![Observe](https://img.shields.io/badge/Observe-Monitoring-00A3E0?style=for-the-badge&logo=observe&logoColor=white)](https://www.observeinc.com/)
-[![CLI](https://img.shields.io/badge/CLI-Powered-326CE5?style=for-the-badge&logo=terminal&logoColor=white)](https://github.com/observeinc/cli)
+[![API](https://img.shields.io/badge/API-Powered-326CE5?style=for-the-badge&logo=curl&logoColor=white)](https://docs.observeinc.com/)
 
 </div>
 
 ## 🎯 Overview
 
-This module provides a direct CLI wrapper for Observe commands through Kubiya. Built on Docker containers and leveraging the power of the Kubiya platform, this tool enables direct execution of any Observe CLI command with full access to all Observe features and capabilities.
+This module provides a direct API wrapper for Observe operations through Kubiya. Built on Docker containers and leveraging the power of the Kubiya platform, this tool enables direct execution of any Observe API operation with full access to all Observe features and capabilities using simple curl commands.
 
 ## 🏗️ How It Works
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#00A3E0', 'fontFamily': 'arial', 'fontSize': '16px' }}}%%
 graph LR
-    A([Kubiya<br/>Teammate]) -->|CLI Command| B[Observe CLI]
-    B -->|Execute| C[Any Observe Command]
-    B -->|Return| D[Command Output]
+    A([Kubiya<br/>Teammate]) -->|API Command| B[Observe API Wrapper]
+    B -->|curl| C[Observe API]
+    B -->|Return| D[Formatted Response]
     
     style A fill:#00A3E0,color:#fff,stroke-width:2px
     style B fill:#1a73e8,color:#fff,stroke-width:2px
@@ -35,20 +35,20 @@ graph LR
 <tr>
 <td width="50%">
 
-### 🔧 Universal CLI Access
-- Execute any Observe CLI command
-- Full command-line functionality
-- Direct access to all features
-- Real-time command execution
+### 🔧 Universal API Access
+- Execute any Observe API operation
+- Full API functionality
+- Direct access to all endpoints
+- Real-time API execution
 
 </td>
 <td width="50%">
 
 ### 🚀 Seamless Integration
-- Native Observe CLI experience
+- Native API experience
 - Command validation
 - Error handling
-- Output formatting
+- JSON response formatting
 
 </td>
 </tr>
@@ -86,7 +86,7 @@ graph LR
 
 - Observe account
 - API key and Customer ID
-- CLI access
+- API access
 - Appropriate permissions
 
 </td>
@@ -121,7 +121,7 @@ export OBSERVE_DATASET_ID="your-dataset-id"
 
 1. Visit [chat.kubiya.ai](https://chat.kubiya.ai)
 2. Navigate to teammate settings
-3. Install Observe CLI tools source
+3. Install Observe API wrapper source
 4. Configure credentials
 
 ### 3️⃣ Start Using
@@ -133,43 +133,125 @@ Example commands:
 "dashboards list"
 "resources list"
 "events list"
+"query <dataset-id> <oql-query>"
+"api GET /v1/datasets"
 ```
 
 ## 📚 Available Commands
 
-The Observe CLI wrapper supports all standard Observe CLI commands:
+The Observe API wrapper supports all standard Observe API operations:
 
 ### Dataset Commands
-- `datasets list` - List datasets
+- `datasets list` - List all datasets
 - `datasets show <dataset-id>` - Show dataset details
-- `datasets create` - Create a new dataset
-- `datasets update <dataset-id>` - Update a dataset
-- `datasets delete <dataset-id>` - Delete a dataset
 
 ### Monitor Commands
-- `monitors list` - List monitors
+- `monitors list` - List all monitors
 - `monitors show <monitor-id>` - Show monitor details
-- `monitors create` - Create a new monitor
-- `monitors update <monitor-id>` - Update a monitor
-- `monitors delete <monitor-id>` - Delete a monitor
 
 ### Dashboard Commands
-- `dashboards list` - List dashboards
+- `dashboards list` - List all dashboards
 - `dashboards show <dashboard-id>` - Show dashboard details
-- `dashboards create` - Create a new dashboard
-- `dashboards update <dashboard-id>` - Update a dashboard
-- `dashboards delete <dashboard-id>` - Delete a dashboard
 
 ### Resource Commands
-- `resources list` - List resources
+- `resources list` - List all resources
 - `resources show <resource-id>` - Show resource details
-- `resources create` - Create a new resource
-- `resources update <resource-id>` - Update a resource
 
 ### Event Commands
-- `events list` - List events
+- `events list` - List all events
 - `events show <event-id>` - Show event details
-- `events create` - Create a new event
+
+### Query Commands
+- `query <dataset-id> <oql-query>` - Execute OQL query on dataset
+
+### Custom API Commands
+- `api <method> <endpoint> [query-params] [body]` - Custom API call
+
+## 🔧 Command Examples
+
+### Basic Operations
+```bash
+# List all datasets
+"datasets list"
+
+# Show specific dataset
+"datasets show your-dataset-id"
+
+# List monitors
+"monitors list"
+
+# Show specific monitor
+"monitors show your-monitor-id"
+```
+
+### Query Operations
+```bash
+# Execute OQL query
+"query your-dataset-id 'pick_col timestamp, log | limit 10'"
+
+# Complex query
+"query your-dataset-id 'filter severity == \"error\" | pick_col timestamp, message, severity | limit 50'"
+```
+
+### Custom API Calls
+```bash
+# GET request
+"api GET /v1/datasets"
+
+# GET with query parameters
+"api GET /v1/datasets 'limit=10&offset=0'"
+
+# POST request with body
+"api POST /v1/query '{\"query\": \"pick_col timestamp, log | limit 10\", \"dataset\": \"your-dataset-id\"}'"
+
+# PUT request
+"api PUT /v1/datasets/your-dataset-id '{\"name\": \"Updated Dataset\"}'"
+
+# DELETE request
+"api DELETE /v1/monitors/your-monitor-id"
+```
+
+## 📊 Response Format
+
+All API responses include:
+- **HTTP Status Code** - Success/error indication
+- **Response Time** - Execution duration
+- **Formatted JSON** - Pretty-printed response data
+- **Error Handling** - Clear error messages
+
+Example response:
+```
+=== Observe API Operation ===
+Command: datasets list
+Operation: datasets
+Sub-operation: list
+Base URL: https://your-customer-id.collect.observeinc.com
+
+Listing datasets...
+
+=== Response ===
+HTTP Status: 200
+Response Time: 0.5s
+
+✅ Success (200)
+
+{
+  "datasets": [
+    {
+      "id": "dataset-1",
+      "name": "Container Logs",
+      "description": "Kubernetes container logs"
+    }
+  ]
+}
+```
+
+## 🔒 Security
+
+- **API Key Authentication** - Bearer token authentication
+- **Environment Variables** - Secure credential storage
+- **Container Isolation** - Isolated execution environment
+- **No CLI Installation** - No external binary dependencies
 
 ## 📚 Learn More
 
