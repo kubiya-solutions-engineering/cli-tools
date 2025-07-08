@@ -48,6 +48,12 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                 exit 1
             fi
             
+            # Install curl if not available
+            if ! command -v curl >/dev/null 2>&1; then
+                echo "Installing curl..."
+                apk add --no-cache curl
+            fi
+            
             # Set base URL with correct format
             OBSERVE_BASE_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
             
