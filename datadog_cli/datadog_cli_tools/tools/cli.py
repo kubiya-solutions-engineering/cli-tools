@@ -29,11 +29,15 @@ class CLITools:
             name="datadog_cli_command",
             description="Execute any Datadog CLI command with full functionality using Dogshell",
             content="""
+            set -e  # Exit on any error
+            
             # Install datadog package if not already installed
             echo "Installing datadog package..."
             pip install datadog --quiet --no-cache-dir
+            echo "✅ Datadog package installed successfully"
             
             # Create .dogrc configuration file
+            echo "Creating configuration file..."
             mkdir -p ~
             cat > ~/.dogrc << EOF
             [Connection]
@@ -42,7 +46,7 @@ class CLITools:
             api_host = https://api.$DD_SITE
             EOF
             
-            echo "Configuration file created at ~/.dogrc"
+            echo "✅ Configuration file created at ~/.dogrc"
             
             # Validate required parameters
             if [ -z "$command" ]; then
@@ -96,14 +100,17 @@ class CLITools:
             fi
             
             echo "=== Executing Datadog Command with Dogshell ==="
-            echo "Command: dog $command"
+            echo "Command: python -m datadog.dog $command"
             echo "Site: $DD_SITE"
             echo "Timestamp: $(date)"
             echo ""
             
             # Execute the dog command using Python module
+            echo "Executing command..."
             output=$(python -m datadog.dog $command 2>&1)
             exit_code=$?
+            
+            echo "Command completed with exit code: $exit_code"
             
             if [ $exit_code -eq 0 ]; then
                 echo "$output"
@@ -121,14 +128,14 @@ class CLITools:
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
                     echo "Common dog commands:"
-                    echo "  • dog monitor list"
-                    echo "  • dog dashboard list"
-                    echo "  • dog metric post"
-                    echo "  • dog event post"
-                    echo "  • dog host list"
-                    echo "  • dog tag list"
-                    echo "  • dog search"
-                    echo "  • dog comment post"
+                    echo "  • python -m datadog.dog monitor list"
+                    echo "  • python -m datadog.dog dashboard list"
+                    echo "  • python -m datadog.dog metric post"
+                    echo "  • python -m datadog.dog event post"
+                    echo "  • python -m datadog.dog host list"
+                    echo "  • python -m datadog.dog tag list"
+                    echo "  • python -m datadog.dog search"
+                    echo "  • python -m datadog.dog comment post"
                     echo ""
                     echo "💡 Tip: Use 'python -m datadog.dog -h' to see all available commands"
                 elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
