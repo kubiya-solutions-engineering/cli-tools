@@ -61,14 +61,68 @@ class CLITools:
             echo "Timestamp: $(date)"
             echo ""
             
-            # Execute the command with error handling
-            if datadog $command; then
+            # Capture command output and error
+            output=$(datadog $command 2>&1)
+            exit_code=$?
+            
+            if [ $exit_code -eq 0 ]; then
+                echo "$output"
                 echo ""
                 echo "✅ Command executed successfully"
             else
+                echo "❌ Command failed with exit code $exit_code"
                 echo ""
-                echo "❌ Command failed with exit code $?"
-                exit 1
+                echo "Command output:"
+                echo "$output"
+                echo ""
+                
+                # Provide helpful hints based on common error patterns
+                if echo "$output" | grep -q "command not found\|unknown command"; then
+                    echo "💡 Hint: The command '$command' is not recognized."
+                    echo ""
+                    echo "Common Datadog CLI commands:"
+                    echo "  • datadog monitor list"
+                    echo "  • datadog dashboard list"
+                    echo "  • datadog logs list"
+                    echo "  • datadog service list"
+                    echo "  • datadog host list"
+                    echo "  • datadog metric list"
+                    echo "  • datadog user list"
+                    echo "  • datadog org list"
+                    echo ""
+                    echo "💡 Tip: Use 'datadog --help' to see all available commands"
+                elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
+                    echo "💡 Hint: Authentication failed. Please check:"
+                    echo "  • DD_API_KEY is correct and has proper permissions"
+                    echo "  • DD_APP_KEY is correct and has proper permissions"
+                    echo "  • DD_SITE is set to the correct Datadog site"
+                    echo ""
+                    echo "💡 Tip: Verify your API key permissions in Datadog:"
+                    echo "  Settings → API Keys → Check permissions"
+                elif echo "$output" | grep -q "not found\|404"; then
+                    echo "💡 Hint: The requested resource was not found."
+                    echo "  • Check if the resource ID/name is correct"
+                    echo "  • Verify the resource exists in your Datadog account"
+                    echo "  • Ensure you have access to the resource"
+                elif echo "$output" | grep -q "rate limit\|429"; then
+                    echo "💡 Hint: Rate limit exceeded."
+                    echo "  • Wait a moment and try again"
+                    echo "  • Consider using pagination for large datasets"
+                    echo "  • Check your Datadog plan limits"
+                elif echo "$output" | grep -q "invalid\|syntax\|malformed"; then
+                    echo "💡 Hint: Invalid command syntax."
+                    echo "  • Check command spelling and format"
+                    echo "  • Use 'datadog $command --help' for usage information"
+                    echo "  • Verify required parameters are provided"
+                else
+                    echo "💡 General troubleshooting tips:"
+                    echo "  • Use 'datadog --help' to see available commands"
+                    echo "  • Use 'datadog $command --help' for specific command help"
+                    echo "  • Check Datadog documentation: https://docs.datadoghq.com/cli/"
+                    echo "  • Verify your Datadog account permissions"
+                fi
+                
+                exit $exit_code
             fi
             """,
             args=[
