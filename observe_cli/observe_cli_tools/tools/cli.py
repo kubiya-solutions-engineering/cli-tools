@@ -178,7 +178,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing datasets..."
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dataset")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/dataset'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         "show")
                             if [ -z "$3" ]; then
@@ -187,7 +189,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             dataset_id="$3"
                             echo "Showing dataset: $dataset_id"
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/dataset/$dataset_id")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/dataset/$dataset_id'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         *)
                             echo "Error: Unknown dataset operation: $SUB_OPERATION"
@@ -200,7 +204,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitors..."
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitors'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         "show")
                             if [ -z "$3" ]; then
@@ -209,7 +215,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             monitor_id="$3"
                             echo "Showing monitor: $monitor_id"
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitors/$monitor_id")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitors/$monitor_id'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         *)
                             echo "Error: Unknown monitors operation: $SUB_OPERATION"
@@ -222,7 +230,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitor mute rules..."
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitor-mute-rules")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitor-mute-rules'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         "show")
                             if [ -z "$3" ]; then
@@ -231,7 +241,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             mute_rule_id="$3"
                             echo "Showing monitor mute rule: $mute_rule_id"
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         *)
                             echo "Error: Unknown monitor-mute-rules operation: $SUB_OPERATION"
@@ -244,7 +256,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing reference tables..."
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/referencetables")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/referencetables'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         "show")
                             if [ -z "$3" ]; then
@@ -253,7 +267,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             table_id="$3"
                             echo "Showing reference table: $table_id"
-                            response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS "$OBSERVE_BASE_URL/v1/referencetables/$table_id")
+                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/referencetables/$table_id'"
+                            echo "DEBUG: Executing: $CURL_CMD"
+                            response=$(eval $CURL_CMD)
                             ;;
                         *)
                             echo "Error: Unknown referencetables operation: $SUB_OPERATION"
@@ -275,7 +291,9 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     echo "Query: $opal_query"
                     # Prepare OPAL query payload
                     QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$dataset_id'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
-                    response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$OBSERVE_BASE_URL/v1/meta/export/query")
+                    CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d '$QUERY_PAYLOAD' '$OBSERVE_BASE_URL/v1/meta/export/query'"
+                    echo "DEBUG: Executing: $CURL_CMD"
+                    response=$(eval $CURL_CMD)
                     ;;
                 "advanced-query")
                     if [ -z "$2" ]; then
@@ -331,7 +349,64 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     query_params=$(echo "$query_params" | sed 's/&$//')
                     full_url="$OBSERVE_BASE_URL/v1/meta/export/query"
                     [ -n "$query_params" ] && full_url="$full_url?$query_params"
-                    response=$(curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d "$QUERY_PAYLOAD" "$full_url")
+                    CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d '$QUERY_PAYLOAD' '$full_url'"
+                    echo "DEBUG: Executing: $CURL_CMD"
+                    response=$(eval $CURL_CMD)
+                    ;;
+                "api")
+                    if [ -z "$2" ] || [ -z "$3" ]; then
+                        echo "Error: API call requires method and endpoint"
+                        echo "Usage: api <method> <endpoint> [query-params] [body]"
+                        print_valid_endpoints
+                        exit 1
+                    fi
+                    method="$2"
+                    endpoint="$3"
+                    query_params="$4"
+                    body="$5"
+
+                    # Validate endpoint/method
+                    if ! is_valid_api "$method" "$endpoint"; then
+                        echo "❌ Error: Invalid API endpoint or method: $method $endpoint"
+                        print_valid_endpoints
+                        # Suggest closest match (simple fuzzy)
+                        echo "\nHint: Did you mean one of these?"
+                        echo "$VALID_ENDPOINTS" | grep "$endpoint" | grep "$method" || echo "$VALID_ENDPOINTS" | grep "$endpoint" || echo "$VALID_ENDPOINTS" | grep "$method" || echo "(see full list above)"
+                        exit 1
+                    fi
+
+                    echo "Making API call: $method $endpoint"
+                    
+                    # Build URL with query parameters
+                    full_url="$OBSERVE_BASE_URL$endpoint"
+                    if [ -n "$query_params" ]; then
+                        full_url="$full_url?$query_params"
+                    fi
+                    
+                    # Build curl command
+                    CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS"
+                    case "$method" in
+                        GET)
+                            CURL_CMD="$CURL_CMD '$full_url'"
+                            ;;
+                        POST|PUT|PATCH)
+                            if [ -n "$body" ]; then
+                                CURL_CMD="$CURL_CMD -X $method -d '$body' '$full_url'"
+                            else
+                                CURL_CMD="$CURL_CMD -X $method '$full_url'"
+                            fi
+                            ;;
+                        DELETE)
+                            CURL_CMD="$CURL_CMD -X DELETE '$full_url'"
+                            ;;
+                        *)
+                            echo "Error: Unsupported HTTP method: $method"
+                            exit 1
+                            ;;
+                    esac
+                    
+                    echo "DEBUG: Executing: $CURL_CMD"
+                    response=$(eval $CURL_CMD)
                     ;;
                 *)
                     echo "Error: Unknown operation: $OPERATION"
