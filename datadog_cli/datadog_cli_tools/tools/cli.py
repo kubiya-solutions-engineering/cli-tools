@@ -1,5 +1,6 @@
 import sys
-from .base import DatadogCLITool, Arg
+import os
+from .base import DatadogCLITool, Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 
 class CLITools:
@@ -25,6 +26,27 @@ class CLITools:
 
     def run_cli_command(self) -> DatadogCLITool:
         """Execute any Datadog CLI command."""
+        
+        # Create the .dogrc configuration file content
+        dogrc_content = """[Connection]
+apikey = ${DD_API_KEY}
+appkey = ${DD_APP_KEY}
+api_host = https://api.${DD_SITE}
+"""
+        
+        # Write the .dogrc file to a temporary location
+        dogrc_path = "/tmp/.dogrc"
+        with open(dogrc_path, "w") as f:
+            f.write(dogrc_content)
+        
+        # Define file specifications
+        file_specs = [
+            FileSpec(
+                source=dogrc_path,
+                destination="/root/.dogrc"
+            )
+        ]
+        
         return DatadogCLITool(
             name="datadog_cli_command",
             description="Execute any Datadog CLI command with full functionality using Dogshell",
@@ -35,18 +57,6 @@ class CLITools:
             echo "Installing datadog package..."
             pip install datadog --quiet --no-cache-dir
             echo "✅ Datadog package installed successfully"
-            
-            # Create .dogrc configuration file
-            echo "Creating configuration file..."
-            mkdir -p ~
-            cat > ~/.dogrc << EOF
-            [Connection]
-            apikey = $DD_API_KEY
-            appkey = $DD_APP_KEY
-            api_host = https://api.$DD_SITE
-            EOF
-            
-            echo "✅ Configuration file created at ~/.dogrc"
             
             # Validate required parameters
             if [ -z "$command" ]; then
@@ -175,7 +185,8 @@ class CLITools:
             args=[
                 Arg(name="command", description="The command to pass to dog (e.g., 'monitor list', 'metric post', 'event post')", required=True)
             ],
-            image="python:3.9-slim"
+            image="python:3.9-slim",
+            with_files=file_specs
         )
 
 CLITools() 
