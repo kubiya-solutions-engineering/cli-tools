@@ -67,10 +67,19 @@ class CLITools:
                     echo "Downloading from: $DOWNLOAD_URL"
                     
                     if curl -L "$DOWNLOAD_URL" -o /tmp/observe.tar.gz; then
-                        tar -xzf /tmp/observe.tar.gz -C /usr/local/bin/
-                        chmod +x /usr/local/bin/observe
+                        echo "Download successful. Extracting..."
+                        tar -tzf /tmp/observe.tar.gz
+                        tar -xzf /tmp/observe.tar.gz -C /tmp/
+                        ls -la /tmp/
+                        if [ -f /tmp/observe ]; then
+                            mv /tmp/observe /usr/local/bin/
+                            chmod +x /usr/local/bin/observe
+                            echo "✅ Observe CLI installed successfully"
+                        else
+                            echo "❌ Observe binary not found in extracted files"
+                            exit 1
+                        fi
                         rm /tmp/observe.tar.gz
-                        echo "✅ Observe CLI installed successfully"
                     else
                         echo "❌ Failed to download Observe CLI"
                         exit 1
@@ -80,10 +89,16 @@ class CLITools:
                     echo "Downloading from: $DOWNLOAD_URL"
                     
                     if curl -L "$DOWNLOAD_URL" -o /tmp/observe.zip; then
-                        unzip -o /tmp/observe.zip -d /usr/local/bin/
-                        chmod +x /usr/local/bin/observe
+                        unzip -o /tmp/observe.zip -d /tmp/
+                        if [ -f /tmp/observe ]; then
+                            mv /tmp/observe /usr/local/bin/
+                            chmod +x /usr/local/bin/observe
+                            echo "✅ Observe CLI installed successfully"
+                        else
+                            echo "❌ Observe binary not found in extracted files"
+                            exit 1
+                        fi
                         rm /tmp/observe.zip
-                        echo "✅ Observe CLI installed successfully"
                     else
                         echo "❌ Failed to download Observe CLI"
                         exit 1
