@@ -122,15 +122,32 @@ class CLITools:
                 exit 1
             fi
             
+            # Set up authentication if environment variables are available
+            AUTH_PARAMS=""
+            if [ -n "$OBSERVE_CUSTOMER_ID" ]; then
+                AUTH_PARAMS="$AUTH_PARAMS --customerid $OBSERVE_CUSTOMER_ID"
+            fi
+            
+            if [ -n "$OBSERVE_API_KEY" ]; then
+                AUTH_PARAMS="$AUTH_PARAMS --authtoken $OBSERVE_API_KEY"
+            fi
+            
+            if [ -n "$OBSERVE_SITE" ]; then
+                AUTH_PARAMS="$AUTH_PARAMS --site $OBSERVE_SITE"
+            else
+                # Default to observeinc.com if not specified
+                AUTH_PARAMS="$AUTH_PARAMS --site observeinc.com"
+            fi
+            
             echo "=== Executing Observe CLI Command ==="
-            echo "Command: observe $command"
+            echo "Command: observe $AUTH_PARAMS $command"
             echo ""
             
-            # Execute the command
-            observe $command
+            # Execute the command with authentication parameters
+            observe $AUTH_PARAMS $command
             """,
             args=[
-                Arg(name="command", description="The command to pass to the Observe CLI (e.g., 'datasets list', 'monitors list')", required=True)
+                Arg(name="command", description="The command to pass to the Observe CLI (e.g., 'datasets list', 'monitors list', 'query -q \"pick_col timestamp, log | limit 10\" -i \"Default.kubernetes/Container Logs\"')", required=True)
             ],
             image="alpine:latest"
         )
