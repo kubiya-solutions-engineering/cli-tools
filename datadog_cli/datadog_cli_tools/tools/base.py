@@ -54,12 +54,12 @@ api_host = https://api.${DD_SITE}
         # Create a temporary file for the .dogrc content
         with tempfile.NamedTemporaryFile(mode='w', suffix='.dogrc', delete=False) as f:
             f.write(dogrc_content)
-            dogrc_path = f.name
+            self.dogrc_path = f.name
         
         # Define file specifications
         file_specs = [
             FileSpec(
-                source=dogrc_path,
+                source=self.dogrc_path,
                 destination="/root/.dogrc"
             )
         ]
@@ -121,12 +121,6 @@ fi
             env=["DD_SITE"],
             with_files=file_specs
         )
-        
-        # Clean up the temporary file
-        try:
-            os.unlink(dogrc_path)
-        except:
-            pass
 
     def get_args(self) -> List[Arg]:
         """Return the tool's arguments."""
