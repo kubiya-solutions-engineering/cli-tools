@@ -41,11 +41,11 @@ class CLITools:
                 exit 1
             fi
             
-            # Set base URL
-            OBSERVE_BASE_URL="https://$OBSERVE_CUSTOMER_ID.collect.observeinc.com"
+            # Set base URL with correct format
+            OBSERVE_BASE_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
             
-            # Set default headers
-            HEADERS="-H 'Authorization: Bearer $OBSERVE_API_KEY' -H 'Content-Type: application/json'"
+            # Set default headers with correct Bearer token format
+            HEADERS="-H 'Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY' -H 'Content-Type: application/json'"
             
             # Helper function to build query parameters
             build_query_params() {
@@ -716,14 +716,15 @@ class CLITools:
                 echo "3. Verify network connectivity to $OBSERVE_BASE_URL"
                 echo "4. Check if the endpoint exists and is accessible"
                 echo "5. Verify SSL/TLS connectivity (if using HTTPS)"
+                echo "6. Ensure Bearer token format is correct: 'Bearer <customerid> <token>'"
                 echo ""
                 
                 # Test authentication
                 echo "=== Authentication Test ==="
                 if [ -n "$OBSERVE_API_KEY" ]; then
-                    echo "✅ API Key is set (length: ${#OBSERVE_API_KEY} characters)"
+                    echo "✅ API Token is set (length: ${#OBSERVE_API_KEY} characters)"
                 else
-                    echo "❌ API Key is not set"
+                    echo "❌ API Token is not set"
                 fi
                 
                 if [ -n "$OBSERVE_CUSTOMER_ID" ]; then
@@ -731,6 +732,8 @@ class CLITools:
                 else
                     echo "❌ Customer ID is not set"
                 fi
+                
+                echo "✅ Bearer token format: Bearer $OBSERVE_CUSTOMER_ID <token>"
                 
                 # Try a simple connectivity test
                 echo "=== Connectivity Test ==="

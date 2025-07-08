@@ -112,10 +112,12 @@ graph LR
 ### 1️⃣ Configure Observe Connection
 
 ```bash
-export OBSERVE_API_KEY="your-api-key"
+export OBSERVE_API_KEY="your-api-token"
 export OBSERVE_CUSTOMER_ID="your-customer-id"
 export OBSERVE_DATASET_ID="your-dataset-id"
 ```
+
+**Note:** The API uses Bearer token authentication with the format: `Authorization: Bearer <customerid> <token>`
 
 ### 2️⃣ Install Tools
 
@@ -276,7 +278,7 @@ Example response:
 Command: datasets list
 Operation: datasets
 Sub-operation: list
-Base URL: https://your-customer-id.collect.observeinc.com
+Base URL: https://your-customer-id.observeinc.com
 
 Listing datasets...
 
