@@ -184,7 +184,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing datasets..."
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/dataset'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/dataset'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -195,7 +195,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             dataset_id="$3"
                             echo "Showing dataset: $dataset_id"
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/dataset/$dataset_id'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/dataset/$dataset_id'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -210,7 +210,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitors..."
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitors'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitors'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -221,7 +221,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             monitor_id="$3"
                             echo "Showing monitor: $monitor_id"
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitors/$monitor_id'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitors/$monitor_id'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -236,7 +236,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitor mute rules..."
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitor-mute-rules'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitor-mute-rules'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -247,7 +247,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             mute_rule_id="$3"
                             echo "Showing monitor mute rule: $mute_rule_id"
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -262,7 +262,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing reference tables..."
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/referencetables'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/referencetables'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -273,7 +273,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                             fi
                             table_id="$3"
                             echo "Showing reference table: $table_id"
-                            CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/referencetables/$table_id'"
+                            CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS '$OBSERVE_BASE_URL/v1/referencetables/$table_id'"
                             echo "DEBUG: Executing: $CURL_CMD"
                             response=$(eval $CURL_CMD)
                             ;;
@@ -297,7 +297,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     echo "Query: $opal_query"
                     # Prepare OPAL query payload
                     QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$dataset_id'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
-                    CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d '$QUERY_PAYLOAD' '$OBSERVE_BASE_URL/v1/meta/export/query'"
+                    CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d '$QUERY_PAYLOAD' '$OBSERVE_BASE_URL/v1/meta/export/query'"
                     echo "DEBUG: Executing: $CURL_CMD"
                     response=$(eval $CURL_CMD)
                     ;;
@@ -355,7 +355,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     query_params=$(echo "$query_params" | sed 's/&$//')
                     full_url="$OBSERVE_BASE_URL/v1/meta/export/query"
                     [ -n "$query_params" ] && full_url="$full_url?$query_params"
-                    CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d '$QUERY_PAYLOAD' '$full_url'"
+                    CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' -X POST $HEADERS -d '$QUERY_PAYLOAD' '$full_url'"
                     echo "DEBUG: Executing: $CURL_CMD"
                     response=$(eval $CURL_CMD)
                     ;;
@@ -390,7 +390,7 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     fi
                     
                     # Build curl command
-                    CURL_CMD="curl -s -w '\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s' $HEADERS"
+                    CURL_CMD="curl -s -w 'HTTP_STATUS:%{http_code} RESPONSE_TIME:%{time_total}s' $HEADERS"
                     case "$method" in
                         GET)
                             CURL_CMD="$CURL_CMD '$full_url'"
