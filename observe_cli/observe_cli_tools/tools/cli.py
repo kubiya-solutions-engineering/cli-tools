@@ -57,29 +57,14 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             # Set base URL with correct format
             OBSERVE_BASE_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
             
-            # Debug authentication details
-            echo "=== Authentication Debug ==="
-            echo "Customer ID: $OBSERVE_CUSTOMER_ID"
-            echo "API Key (first 10 chars): ${OBSERVE_API_KEY:0:10}..."
-            echo "Base URL: $OBSERVE_BASE_URL"
-            echo "Authorization Header: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY"
-            echo ""
-            
             # Helper function to execute curl with proper output formatting
             execute_curl() {
                 local method="$1"
                 local url="$2"
                 local data="$3"
                 
-                echo "DEBUG: Method: $method"
-                echo "DEBUG: URL: $url"
-                echo "DEBUG: Data: $data"
-                echo "DEBUG: Customer ID: $OBSERVE_CUSTOMER_ID"
-                echo "DEBUG: API Key (first 10 chars): ${OBSERVE_API_KEY:0:10}..."
-                
                 # Execute curl with metadata and response body separated by a unique delimiter
                 if [ -n "$data" ]; then
-                    echo "DEBUG: Executing curl with data..."
                     curl -s -w "METADATA_START\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s\nMETADATA_END\n" \
                          -X "$method" \
                          -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
@@ -87,15 +72,12 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                          -d "$data" \
                          "$url"
                 else
-                    echo "DEBUG: Executing curl without data..."
                     curl -s -w "METADATA_START\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s\nMETADATA_END\n" \
                          -X "$method" \
                          -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                          -H "Content-Type: application/json" \
                          "$url"
                 fi
-                
-                echo "DEBUG: Curl command completed"
             }
             
             # Helper function to build query parameters
@@ -213,7 +195,6 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             echo "Command: $command"
             echo "Operation: $OPERATION"
             echo "Sub-operation: $SUB_OPERATION"
-            echo "Base URL: $OBSERVE_BASE_URL"
             echo ""
             
             # Handle different operation types
@@ -222,17 +203,18 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing datasets..."
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/dataset"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/dataset")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
                                 echo "Error: Dataset ID is required for 'dataset show'"
+                                echo ""
+                                echo "💡 Hint: Use 'dataset list' to see available dataset IDs first."
+                                echo "   Then use: dataset show <dataset-id>"
                                 exit 1
                             fi
                             dataset_id="$3"
                             echo "Showing dataset: $dataset_id"
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/dataset/$dataset_id"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/dataset/$dataset_id")
                             ;;
                         *)
@@ -246,17 +228,18 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitors..."
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/monitors"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/monitors")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
                                 echo "Error: Monitor ID is required for 'monitors show'"
+                                echo ""
+                                echo "💡 Hint: Use 'monitors list' to see available monitor IDs first."
+                                echo "   Then use: monitors show <monitor-id>"
                                 exit 1
                             fi
                             monitor_id="$3"
                             echo "Showing monitor: $monitor_id"
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/monitors/$monitor_id"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/monitors/$monitor_id")
                             ;;
                         *)
@@ -270,17 +253,18 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing monitor mute rules..."
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/monitor-mute-rules"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/monitor-mute-rules")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
                                 echo "Error: Mute Rule ID is required for 'monitor-mute-rules show'"
+                                echo ""
+                                echo "💡 Hint: Use 'monitor-mute-rules list' to see available mute rule IDs first."
+                                echo "   Then use: monitor-mute-rules show <mute-rule-id>"
                                 exit 1
                             fi
                             mute_rule_id="$3"
                             echo "Showing monitor mute rule: $mute_rule_id"
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/monitor-mute-rules/$mute_rule_id")
                             ;;
                         *)
@@ -294,17 +278,18 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     case "$SUB_OPERATION" in
                         "list")
                             echo "Listing reference tables..."
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/referencetables"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/referencetables")
                             ;;
                         "show")
                             if [ -z "$3" ]; then
                                 echo "Error: Reference Table ID is required for 'referencetables show'"
+                                echo ""
+                                echo "💡 Hint: Use 'referencetables list' to see available reference table IDs first."
+                                echo "   Then use: referencetables show <table-id>"
                                 exit 1
                             fi
                             table_id="$3"
                             echo "Showing reference table: $table_id"
-                            echo "DEBUG: Executing GET request to $OBSERVE_BASE_URL/v1/referencetables/$table_id"
                             response=$(execute_curl "GET" "$OBSERVE_BASE_URL/v1/referencetables/$table_id")
                             ;;
                         *)
@@ -318,6 +303,13 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     if [ -z "$2" ] || [ -z "$3" ]; then
                         echo "Error: Query requires dataset ID and OPAL query"
                         echo "Usage: query <dataset-id> <opal-query>"
+                        echo ""
+                        echo "💡 Hint: Use 'dataset list' to see available dataset IDs first."
+                        echo "   Common OPAL query examples:"
+                        echo "   - query <dataset-id> 'filter severity == \"error\"'"
+                        echo "   - query <dataset-id> 'filter timestamp > \"2023-01-01T00:00:00Z\"'"
+                        echo "   - query <dataset-id> 'make count()'"
+                        echo "   - query <dataset-id> 'filter message =~ \"error\" | make count()'"
                         exit 1
                     fi
                     dataset_id="$2"
@@ -327,7 +319,6 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     echo "Query: $opal_query"
                     # Prepare OPAL query payload
                     QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$dataset_id'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
-                    echo "DEBUG: Executing POST request to $OBSERVE_BASE_URL/v1/meta/export/query"
                     response=$(execute_curl "POST" "$OBSERVE_BASE_URL/v1/meta/export/query" "$QUERY_PAYLOAD")
                     ;;
                 "advanced-query")
@@ -384,7 +375,6 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     query_params=$(echo "$query_params" | sed 's/&$//')
                     full_url="$OBSERVE_BASE_URL/v1/meta/export/query"
                     [ -n "$query_params" ] && full_url="$full_url?$query_params"
-                    echo "DEBUG: Executing POST request to $full_url"
                     response=$(execute_curl "POST" "$full_url" "$QUERY_PAYLOAD")
                     ;;
                 "api")
@@ -417,12 +407,17 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                         full_url="$full_url?$query_params"
                     fi
                     
-                    echo "DEBUG: Executing $method request to $full_url"
                     response=$(execute_curl "$method" "$full_url" "$body")
                     ;;
                 *)
                     echo "Error: Unknown operation: $OPERATION"
                     echo "Supported operations: dataset, monitors, monitor-mute-rules, referencetables, query, api, advanced-query"
+                    echo ""
+                    echo "💡 Hint: Try one of these common operations:"
+                    echo "   - 'dataset list' - List all datasets"
+                    echo "   - 'monitors list' - List all monitors"
+                    echo "   - 'query <dataset-id> <opal-query>' - Execute a query"
+                    echo "   - 'api GET /v1/dataset' - Make a custom API call"
                     exit 1
                     ;;
             esac
@@ -489,18 +484,10 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             fi
             
             # Parse response to separate body and metadata
-            echo "DEBUG: Raw response length: ${#response} characters"
-            echo "DEBUG: Raw response (first 500 chars): ${response:0:500}"
-            echo ""
-            
             # Extract metadata between METADATA_START and METADATA_END
             metadata=$(echo "$response" | sed -n '/METADATA_START/,/METADATA_END/p' | grep -v "METADATA_START\|METADATA_END")
             # Extract response body (everything after METADATA_END)
             response_body=$(echo "$response" | sed -n '/METADATA_END/,$p' | sed '1d')
-            
-            echo "DEBUG: Extracted metadata: $metadata"
-            echo "DEBUG: Response body length: ${#response_body} characters"
-            echo ""
             
             # Extract HTTP status code and response time from metadata
             http_status=$(echo "$metadata" | grep "HTTP_STATUS:" | sed 's/.*HTTP_STATUS://' | tr -d ' ')
@@ -533,12 +520,63 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                     404)
                         echo "Not Found - The requested resource was not found"
                         echo "Please verify the endpoint or resource ID"
+                        
+                        # Provide specific hints based on the operation
+                        if [ "$OPERATION" = "dataset" ] && [ "$SUB_OPERATION" = "show" ]; then
+                            echo ""
+                            echo "💡 Hint: Make sure the dataset ID is correct."
+                            echo "   Try 'dataset list' to see available datasets first."
+                        elif [ "$OPERATION" = "monitors" ] && [ "$SUB_OPERATION" = "show" ]; then
+                            echo ""
+                            echo "💡 Hint: Make sure the monitor ID is correct."
+                            echo "   Try 'monitors list' to see available monitors first."
+                        elif [ "$OPERATION" = "monitor-mute-rules" ] && [ "$SUB_OPERATION" = "show" ]; then
+                            echo ""
+                            echo "💡 Hint: Make sure the mute rule ID is correct."
+                            echo "   Try 'monitor-mute-rules list' to see available mute rules first."
+                        elif [ "$OPERATION" = "referencetables" ] && [ "$SUB_OPERATION" = "show" ]; then
+                            echo ""
+                            echo "💡 Hint: Make sure the reference table ID is correct."
+                            echo "   Try 'referencetables list' to see available reference tables first."
+                        elif [ "$OPERATION" = "query" ]; then
+                            echo ""
+                            echo "💡 Hint: Make sure the dataset ID is correct."
+                            echo "   Try 'dataset list' to see available datasets first."
+                        elif [ "$OPERATION" = "api" ]; then
+                            echo ""
+                            echo "💡 Hint: Check if the endpoint path is correct."
+                            echo "   Common endpoints: /v1/dataset, /v1/monitors, /v1/referencetables"
+                            echo "   Try 'api GET /v1/dataset' for a working example."
+                        fi
                         ;;
                     409)
                         echo "Conflict - The request conflicts with current state"
                         ;;
                     422)
                         echo "Unprocessable Entity - The request was well-formed but contains invalid parameters"
+                        
+                        # Provide specific hints for 422 errors
+                        if [ "$OPERATION" = "query" ]; then
+                            echo ""
+                            echo "💡 Hint: Check your OPAL query syntax."
+                            echo "   Common OPAL examples:"
+                            echo "   - 'filter severity == \"error\"'"
+                            echo "   - 'filter timestamp > \"2023-01-01T00:00:00Z\"'"
+                            echo "   - 'make count()'"
+                            echo "   - 'filter message =~ \"error\"'"
+                        elif [ "$OPERATION" = "advanced-query" ]; then
+                            echo ""
+                            echo "💡 Hint: Check your query parameters:"
+                            echo "   - startTime/endTime should be ISO8601 format (e.g., 2023-04-20T16:20:00Z)"
+                            echo "   - interval should be valid duration (e.g., 1h, 10m, 30s)"
+                            echo "   - OPAL syntax should be valid"
+                        elif [ "$OPERATION" = "api" ]; then
+                            echo ""
+                            echo "💡 Hint: Check your request parameters:"
+                            echo "   - Query parameters should be properly formatted"
+                            echo "   - Request body should be valid JSON"
+                            echo "   - URL encoding for special characters"
+                        fi
                         ;;
                     429)
                         echo "Too Many Requests - Rate limit exceeded"
@@ -650,7 +688,34 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             fi
             """,
             args=[
-                Arg(name="command", description="The command to execute (e.g., 'dataset list', 'monitors show <id>', 'query <dataset-id> <oql-query>', 'api GET /v1/dataset')", required=True)
+                Arg(name="command", description="""The command to execute. Examples:
+
+Basic Operations:
+- 'dataset list' - List all datasets
+- 'dataset show <dataset-id>' - Show dataset details
+- 'monitors list' - List all monitors  
+- 'monitors show <monitor-id>' - Show monitor details
+- 'monitor-mute-rules list' - List all monitor mute rules
+- 'monitor-mute-rules show <mute-rule-id>' - Show mute rule details
+- 'referencetables list' - List all reference tables
+- 'referencetables show <table-id>' - Show reference table details
+
+Query Operations:
+- 'query <dataset-id> <opal-query>' - Execute OPAL query on dataset
+- 'advanced-query <dataset-id> --startTime 2023-04-20T16:20:00Z --endTime 2023-04-20T16:30:00Z' - Query with time range
+- 'advanced-query <dataset-id> --interval 1h --opal "filter severity == \\"error\\""' - Query with interval and filter
+
+Custom API Calls:
+- 'api GET /v1/dataset' - Get all datasets
+- 'api GET /v1/monitors' - Get all monitors
+- 'api POST /v1/monitors' - Create a monitor (with body)
+- 'api GET /v1/dataset/{id}' - Get specific dataset
+
+OPAL Query Examples:
+- 'query <dataset-id> "filter severity == \\"error\\""' - Filter by severity
+- 'query <dataset-id> "filter timestamp > \\"2023-01-01T00:00:00Z\\""' - Filter by timestamp
+- 'query <dataset-id> "make count()"' - Count records
+- 'query <dataset-id> "filter message =~ \\"error\\" | make count()"' - Filter and count""", required=True)
             ],
             image="alpine:latest"
         )
