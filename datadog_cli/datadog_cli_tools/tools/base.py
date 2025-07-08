@@ -42,6 +42,7 @@ class DatadogCLITool(Tool):
     icon_url: str = DATADOG_CLI_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
+    dogrc_path: str = ""
     
     def __init__(self, name, description, content, args=None, image="datadog/cli:latest"):
         # Create the .dogrc configuration file content
