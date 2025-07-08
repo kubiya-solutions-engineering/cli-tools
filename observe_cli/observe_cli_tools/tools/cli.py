@@ -57,8 +57,46 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             # Set base URL with correct format
             OBSERVE_BASE_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
             
-            # Set default headers with correct Bearer token format
-            HEADERS="-H 'Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY' -H 'Content-Type: application/json'"
+            # Debug authentication details
+            echo "=== Authentication Debug ==="
+            echo "Customer ID: $OBSERVE_CUSTOMER_ID"
+            echo "API Key (first 10 chars): ${OBSERVE_API_KEY:0:10}..."
+            echo "Base URL: $OBSERVE_BASE_URL"
+            echo "Authorization Header: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY"
+            echo ""
+            
+            # Helper function to execute curl with proper output formatting
+            execute_curl() {
+                local method="$1"
+                local url="$2"
+                local data="$3"
+                
+                echo "DEBUG: Method: $method"
+                echo "DEBUG: URL: $url"
+                echo "DEBUG: Data: $data"
+                echo "DEBUG: Customer ID: $OBSERVE_CUSTOMER_ID"
+                echo "DEBUG: API Key (first 10 chars): ${OBSERVE_API_KEY:0:10}..."
+                
+                # Execute curl with metadata and response body separated by a unique delimiter
+                if [ -n "$data" ]; then
+                    echo "DEBUG: Executing curl with data..."
+                    curl -s -w "METADATA_START\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s\nMETADATA_END\n" \
+                         -X "$method" \
+                         -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                         -H "Content-Type: application/json" \
+                         -d "$data" \
+                         "$url"
+                else
+                    echo "DEBUG: Executing curl without data..."
+                    curl -s -w "METADATA_START\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s\nMETADATA_END\n" \
+                         -X "$method" \
+                         -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                         -H "Content-Type: application/json" \
+                         "$url"
+                fi
+                
+                echo "DEBUG: Curl command completed"
+            }
             
             # Helper function to build query parameters
             build_query_params() {
@@ -110,26 +148,6 @@ Execute any Observe API operation with dynamic parameters and proper response pa
                 # Remove trailing & if present
                 params=$(echo "$params" | sed 's/&$//')
                 echo "$params"
-            }
-            
-            # Helper function to execute curl with proper output formatting
-            execute_curl() {
-                local method="$1"
-                local url="$2"
-                local data="$3"
-                
-                # Execute curl with metadata and response body separated by a unique delimiter
-                if [ -n "$data" ]; then
-                    curl -s -w "METADATA_START\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s\nMETADATA_END\n" \
-                         -X "$method" \
-                         $HEADERS \
-                         -d "$data" \
-                         "$url"
-                else
-                    curl -s -w "METADATA_START\nHTTP_STATUS:%{http_code}\nRESPONSE_TIME:%{time_total}s\nMETADATA_END\n" \
-                         $HEADERS \
-                         "$url"
-                fi
             }
             
             # Static list of valid endpoints and methods (from OpenAPI spec)
@@ -471,10 +489,18 @@ Execute any Observe API operation with dynamic parameters and proper response pa
             fi
             
             # Parse response to separate body and metadata
+            echo "DEBUG: Raw response length: ${#response} characters"
+            echo "DEBUG: Raw response (first 500 chars): ${response:0:500}"
+            echo ""
+            
             # Extract metadata between METADATA_START and METADATA_END
             metadata=$(echo "$response" | sed -n '/METADATA_START/,/METADATA_END/p' | grep -v "METADATA_START\|METADATA_END")
             # Extract response body (everything after METADATA_END)
             response_body=$(echo "$response" | sed -n '/METADATA_END/,$p' | sed '1d')
+            
+            echo "DEBUG: Extracted metadata: $metadata"
+            echo "DEBUG: Response body length: ${#response_body} characters"
+            echo ""
             
             # Extract HTTP status code and response time from metadata
             http_status=$(echo "$metadata" | grep "HTTP_STATUS:" | sed 's/.*HTTP_STATUS://' | tr -d ' ')
