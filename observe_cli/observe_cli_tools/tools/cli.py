@@ -270,15 +270,120 @@ class CLITools:
             echo "Response Time: ${response_time}s"
             echo ""
             
-            # Check HTTP status code
+            # Enhanced error handling with detailed information
             if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
                 echo "✅ Success ($http_status)"
             elif [ "$http_status" -ge 400 ] && [ "$http_status" -lt 500 ]; then
                 echo "❌ Client Error ($http_status)"
+                echo ""
+                echo "=== Error Details ==="
+                case "$http_status" in
+                    400)
+                        echo "Bad Request - The request was malformed or invalid"
+                        ;;
+                    401)
+                        echo "Unauthorized - Invalid or missing API key"
+                        echo "Please check your OBSERVE_API_KEY environment variable"
+                        ;;
+                    403)
+                        echo "Forbidden - Insufficient permissions for this operation"
+                        echo "Please check your API key permissions"
+                        ;;
+                    404)
+                        echo "Not Found - The requested resource was not found"
+                        echo "Please verify the endpoint or resource ID"
+                        ;;
+                    409)
+                        echo "Conflict - The request conflicts with current state"
+                        ;;
+                    422)
+                        echo "Unprocessable Entity - The request was well-formed but contains invalid parameters"
+                        ;;
+                    429)
+                        echo "Too Many Requests - Rate limit exceeded"
+                        echo "Please wait before making additional requests"
+                        ;;
+                    *)
+                        echo "Client Error - HTTP $http_status"
+                        ;;
+                esac
+                
+                # Try to extract error details from response body
+                if command -v jq >/dev/null 2>&1; then
+                    error_message=$(echo "$response_body" | jq -r '.error // .message // .detail // "No error message provided"' 2>/dev/null)
+                    if [ "$error_message" != "null" ] && [ "$error_message" != "No error message provided" ]; then
+                        echo ""
+                        echo "Error Message: $error_message"
+                    fi
+                    
+                    # Extract additional error details if available
+                    error_code=$(echo "$response_body" | jq -r '.code // .error_code // "N/A"' 2>/dev/null)
+                    if [ "$error_code" != "null" ] && [ "$error_code" != "N/A" ]; then
+                        echo "Error Code: $error_code"
+                    fi
+                    
+                    # Show full error response for debugging
+                    echo ""
+                    echo "=== Full Error Response ==="
+                    echo "$response_body" | jq '.' 2>/dev/null || echo "$response_body"
+                else
+                    echo ""
+                    echo "=== Full Error Response ==="
+                    echo "$response_body"
+                fi
+                
+                exit 1
             elif [ "$http_status" -ge 500 ]; then
                 echo "❌ Server Error ($http_status)"
+                echo ""
+                echo "=== Error Details ==="
+                case "$http_status" in
+                    500)
+                        echo "Internal Server Error - The server encountered an unexpected condition"
+                        ;;
+                    502)
+                        echo "Bad Gateway - The server received an invalid response from upstream"
+                        ;;
+                    503)
+                        echo "Service Unavailable - The service is temporarily unavailable"
+                        echo "Please try again later"
+                        ;;
+                    504)
+                        echo "Gateway Timeout - The server did not receive a timely response"
+                        ;;
+                    *)
+                        echo "Server Error - HTTP $http_status"
+                        ;;
+                esac
+                
+                # Try to extract error details from response body
+                if command -v jq >/dev/null 2>&1; then
+                    error_message=$(echo "$response_body" | jq -r '.error // .message // .detail // "No error message provided"' 2>/dev/null)
+                    if [ "$error_message" != "null" ] && [ "$error_message" != "No error message provided" ]; then
+                        echo ""
+                        echo "Error Message: $error_message"
+                    fi
+                    
+                    # Show full error response for debugging
+                    echo ""
+                    echo "=== Full Error Response ==="
+                    echo "$response_body" | jq '.' 2>/dev/null || echo "$response_body"
+                else
+                    echo ""
+                    echo "=== Full Error Response ==="
+                    echo "$response_body"
+                fi
+                
+                exit 1
             else
                 echo "⚠️  Unexpected Status ($http_status)"
+                echo ""
+                echo "=== Response Details ==="
+                if command -v jq >/dev/null 2>&1; then
+                    echo "$response_body" | jq '.' 2>/dev/null || echo "$response_body"
+                else
+                    echo "$response_body"
+                fi
             fi
             echo ""
             
