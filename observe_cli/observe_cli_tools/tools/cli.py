@@ -30,11 +30,38 @@ class CLITools:
             name="observe_cli_command",
             description="Execute any Observe CLI command",
             content="""
+            # Detect platform and architecture
+            OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+            ARCH=$(uname -m)
+            
+            # Map architecture to Observe CLI format
+            case $ARCH in
+                x86_64) ARCH="amd64" ;;
+                arm64) ARCH="arm64" ;;
+                aarch64) ARCH="arm64" ;;
+                *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+            esac
+            
             # Install observe CLI if not present
             if ! command -v observe &> /dev/null; then
-                echo "Installing Observe CLI..."
-                curl -L https://github.com/observeinc/cli/releases/latest/download/observe-cli-linux-amd64 -o /usr/local/bin/observe
-                chmod +x /usr/local/bin/observe
+                echo "Installing Observe CLI for $OS-$ARCH..."
+                
+                # Create directory if it doesn't exist
+                mkdir -p /usr/local/bin
+                
+                # Download the appropriate version
+                DOWNLOAD_URL="https://github.com/observeinc/cli/releases/latest/download/observe-cli-$OS-$ARCH"
+                echo "Downloading from: $DOWNLOAD_URL"
+                
+                if curl -L "$DOWNLOAD_URL" -o /usr/local/bin/observe; then
+                    chmod +x /usr/local/bin/observe
+                    echo "✅ Observe CLI installed successfully"
+                else
+                    echo "❌ Failed to download Observe CLI"
+                    exit 1
+                fi
+            else
+                echo "✅ Observe CLI already installed"
             fi
             
             # Validate required parameters
@@ -48,7 +75,7 @@ class CLITools:
             echo ""
             
             # Execute the command
-            /usr/local/bin/observe $command
+            observe $command
             """,
             args=[
                 Arg(name="command", description="The command to pass to the Observe CLI (e.g., 'datasets list', 'monitors list')", required=True)
