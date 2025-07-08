@@ -33,10 +33,6 @@ class CLITools:
             echo "Installing datadog package..."
             pip install datadog --quiet --no-cache-dir
             
-            # Add Python scripts directory to PATH
-            export PATH="$PATH:$(python -m site --user-base)/bin"
-            export PATH="$PATH:$(python -c 'import sys; print(sys.prefix + "/bin")')"
-            
             # Create .dogrc configuration file
             mkdir -p ~
             cat > ~/.dogrc << EOF
@@ -105,19 +101,9 @@ class CLITools:
             echo "Timestamp: $(date)"
             echo ""
             
-            # Try to run dog command
-            if command -v dog &> /dev/null; then
-                # Capture command output and error
-                output=$(dog $command 2>&1)
-                exit_code=$?
-            else
-                echo "❌ Error: 'dog' command not found in PATH"
-                echo "Current PATH: $PATH"
-                echo ""
-                echo "Attempting to run dog via Python module..."
-                output=$(python -m datadog.dog $command 2>&1)
-                exit_code=$?
-            fi
+            # Execute the dog command using Python module
+            output=$(python -m datadog.dog $command 2>&1)
+            exit_code=$?
             
             if [ $exit_code -eq 0 ]; then
                 echo "$output"
@@ -131,7 +117,7 @@ class CLITools:
                 echo ""
                 
                 # Provide helpful hints based on common error patterns
-                if echo "$output" | grep -q "command not found\|unknown command\|No module named"; then
+                if echo "$output" | grep -q "command not found\|unknown command\|No module named\|usage:"; then
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
                     echo "Common dog commands:"
@@ -144,7 +130,7 @@ class CLITools:
                     echo "  • dog search"
                     echo "  • dog comment post"
                     echo ""
-                    echo "💡 Tip: Use 'dog -h' to see all available commands"
+                    echo "💡 Tip: Use 'python -m datadog.dog -h' to see all available commands"
                 elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
                     echo "💡 Hint: Authentication failed. Please check:"
                     echo "  • DD_API_KEY is correct and has proper permissions"
@@ -166,12 +152,12 @@ class CLITools:
                 elif echo "$output" | grep -q "invalid\|syntax\|malformed"; then
                     echo "💡 Hint: Invalid command syntax."
                     echo "  • Check command spelling and format"
-                    echo "  • Use 'dog $command -h' for usage information"
+                    echo "  • Use 'python -m datadog.dog $command -h' for usage information"
                     echo "  • Verify required parameters are provided"
                 else
                     echo "💡 General troubleshooting tips:"
-                    echo "  • Use 'dog -h' to see available commands"
-                    echo "  • Use 'dog $command -h' for specific command help"
+                    echo "  • Use 'python -m datadog.dog -h' to see available commands"
+                    echo "  • Use 'python -m datadog.dog $command -h' for specific command help"
                     echo "  • Check Dogshell documentation: https://docs.datadoghq.com/developers/guide/dogshell/"
                     echo "  • Verify your Datadog account permissions"
                 fi
