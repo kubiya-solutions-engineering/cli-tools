@@ -30,7 +30,29 @@ class CLITools:
             description="Execute any Datadog CLI command with full functionality using Dogshell",
             content="""
             # Install datadog package if not already installed
-            pip install datadog --quiet
+            echo "Installing datadog package..."
+            pip install datadog --quiet --no-cache-dir
+            
+            # Verify installation and find dog command
+            if ! command -v dog &> /dev/null; then
+                echo "❌ Error: 'dog' command not found after installation"
+                echo "Attempting to find dog command in Python packages..."
+                
+                # Try to find dog command in Python packages
+                DOG_PATH=$(python -c "import datadog; import os; print(os.path.join(os.path.dirname(datadog.__file__), 'dog'))" 2>/dev/null)
+                
+                if [ -f "$DOG_PATH" ]; then
+                    echo "Found dog command at: $DOG_PATH"
+                    DOG_CMD="$DOG_PATH"
+                else
+                    echo "❌ Could not locate dog command. Installation may have failed."
+                    echo "Available Python packages:"
+                    pip list | grep datadog || echo "No datadog package found"
+                    exit 1
+                fi
+            else
+                DOG_CMD="dog"
+            fi
             
             # Create .dogrc configuration file
             mkdir -p ~
@@ -40,6 +62,8 @@ class CLITools:
             appkey = $DD_APP_KEY
             api_host = https://api.$DD_SITE
             EOF
+            
+            echo "Configuration file created at ~/.dogrc"
             
             # Validate required parameters
             if [ -z "$command" ]; then
@@ -93,13 +117,13 @@ class CLITools:
             fi
             
             echo "=== Executing Datadog Command with Dogshell ==="
-            echo "Command: dog $command"
+            echo "Command: $DOG_CMD $command"
             echo "Site: $DD_SITE"
             echo "Timestamp: $(date)"
             echo ""
             
             # Capture command output and error
-            output=$(dog $command 2>&1)
+            output=$($DOG_CMD $command 2>&1)
             exit_code=$?
             
             if [ $exit_code -eq 0 ]; then
@@ -118,16 +142,16 @@ class CLITools:
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
                     echo "Common dog commands:"
-                    echo "  • dog monitor list"
-                    echo "  • dog dashboard list"
-                    echo "  • dog metric post"
-                    echo "  • dog event post"
-                    echo "  • dog host list"
-                    echo "  • dog tag list"
-                    echo "  • dog search"
-                    echo "  • dog comment post"
+                    echo "  • $DOG_CMD monitor list"
+                    echo "  • $DOG_CMD dashboard list"
+                    echo "  • $DOG_CMD metric post"
+                    echo "  • $DOG_CMD event post"
+                    echo "  • $DOG_CMD host list"
+                    echo "  • $DOG_CMD tag list"
+                    echo "  • $DOG_CMD search"
+                    echo "  • $DOG_CMD comment post"
                     echo ""
-                    echo "💡 Tip: Use 'dog -h' to see all available commands"
+                    echo "💡 Tip: Use '$DOG_CMD -h' to see all available commands"
                 elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
                     echo "💡 Hint: Authentication failed. Please check:"
                     echo "  • DD_API_KEY is correct and has proper permissions"
@@ -149,12 +173,12 @@ class CLITools:
                 elif echo "$output" | grep -q "invalid\|syntax\|malformed"; then
                     echo "💡 Hint: Invalid command syntax."
                     echo "  • Check command spelling and format"
-                    echo "  • Use 'dog $command -h' for usage information"
+                    echo "  • Use '$DOG_CMD $command -h' for usage information"
                     echo "  • Verify required parameters are provided"
                 else
                     echo "💡 General troubleshooting tips:"
-                    echo "  • Use 'dog -h' to see available commands"
-                    echo "  • Use 'dog $command -h' for specific command help"
+                    echo "  • Use '$DOG_CMD -h' to see available commands"
+                    echo "  • Use '$DOG_CMD $command -h' for specific command help"
                     echo "  • Check Dogshell documentation: https://docs.datadoghq.com/developers/guide/dogshell/"
                     echo "  • Verify your Datadog account permissions"
                 fi
