@@ -48,7 +48,7 @@ class CLITools:
             echo ""
             
             # Execute the command
-            observe $command
+            /usr/local/bin/observe $command
             """,
             args=[
                 Arg(name="command", description="The command to pass to the Observe CLI (e.g., 'datasets list', 'monitors list')", required=True)
