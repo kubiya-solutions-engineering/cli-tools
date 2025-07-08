@@ -30,6 +30,12 @@ class CLITools:
             name="observe_cli_command",
             description="Execute any Observe CLI command",
             content="""
+            # Install curl if not available
+            if ! command -v curl &> /dev/null; then
+                echo "Installing curl..."
+                apk add --no-cache curl
+            fi
+            
             # Detect platform and architecture
             OS=$(uname -s | tr '[:upper:]' '[:lower:]')
             ARCH=$(uname -m)
