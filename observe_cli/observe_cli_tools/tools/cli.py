@@ -75,8 +75,13 @@ class CLITools:
                             mv /tmp/observe /usr/local/bin/
                             chmod +x /usr/local/bin/observe
                             echo "✅ Observe CLI installed successfully"
+                        elif [ -f /tmp/observe_${VERSION}_${OS}_${ARCH}/observe ]; then
+                            mv /tmp/observe_${VERSION}_${OS}_${ARCH}/observe /usr/local/bin/
+                            chmod +x /usr/local/bin/observe
+                            echo "✅ Observe CLI installed successfully"
                         else
                             echo "❌ Observe binary not found in extracted files"
+                            find /tmp -name "observe" -type f
                             exit 1
                         fi
                         rm /tmp/observe.tar.gz
