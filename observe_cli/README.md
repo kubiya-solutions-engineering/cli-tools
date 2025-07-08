@@ -163,6 +163,7 @@ The Observe API wrapper supports all standard Observe API operations:
 
 ### Query Commands
 - `query <dataset-id> <oql-query>` - Execute OQL query on dataset
+- `advanced-query <dataset-id> [options]` - Advanced query with filters, time ranges, and parameters
 
 ### Custom API Commands
 - `api <method> <endpoint> [query-params] [body]` - Custom API call
@@ -193,6 +194,27 @@ The Observe API wrapper supports all standard Observe API operations:
 "query your-dataset-id 'filter severity == \"error\" | pick_col timestamp, message, severity | limit 50'"
 ```
 
+### Advanced Query Operations
+```bash
+# Query with time preset
+"advanced-query your-dataset-id --time-preset PAST_1_HOUR"
+
+# Query with specific time range
+"advanced-query your-dataset-id --time-start 1686165391864 --time-end 1686251791864"
+
+# Query with filter
+"advanced-query your-dataset-id --filter-eq status error"
+
+# Query with operator filter
+"advanced-query your-dataset-id --filter severity != warning"
+
+# Query with OPAL statement
+"advanced-query your-dataset-id --opal 'filter severity == \"error\"'"
+
+# Query with multiple parameters
+"advanced-query your-dataset-id --time-preset PAST_15_MINUTES --filter-eq level ERROR --param environment production"
+```
+
 ### Custom API Calls
 ```bash
 # GET request
@@ -210,6 +232,35 @@ The Observe API wrapper supports all standard Observe API operations:
 # DELETE request
 "api DELETE /v1/monitors/your-monitor-id"
 ```
+
+## 📊 Advanced URL Parameters
+
+The API wrapper supports all Observe URL parameters for advanced filtering and customization:
+
+### Time Ranges
+- `--time-start <timestamp>` - Start time (Unix epoch or ISO 8601)
+- `--time-end <timestamp>` - End time (Unix epoch or ISO 8601)  
+- `--time-preset <preset>` - Time preset (TODAY, YESTERDAY, PAST_1_HOUR, etc.)
+
+### Filters
+- `--filter-eq <column> <value>` - Simple equals filter
+- `--filter <column> <operator> <value>` - Advanced filter with operators (=, !=, ~, !~, >, <, >=, <=)
+
+### OPAL Statements
+- `--opal <opal-statement>` - Full OPAL statement for complex filtering
+
+### Parameters
+- `--param <key> <value>` - Custom parameters for dashboards and worksheets
+- `--tab <tab-name>` - Tab selection (resources, logs, related)
+- `--dash <dashboard-id>` - Dashboard selection
+
+### Supported Time Presets
+- TODAY, YESTERDAY, THIS_DAY_LAST_WEEK
+- LAST_WEEK, LAST_MONTH
+- PAST_5_MINUTES, PAST_10_MINUTES, PAST_15_MINUTES, PAST_30_MINUTES
+- PAST_60_MINUTES, PAST_2_HOURS, PAST_4_HOURS, PAST_6_HOURS
+- PAST_12_HOURS, PAST_24_HOURS
+- PAST_2_DAYS, PAST_3_DAYS, PAST_4_DAYS, PAST_7_DAYS, PAST_14_DAYS, PAST_30_DAYS
 
 ## 📊 Response Format
 

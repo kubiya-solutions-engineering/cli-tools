@@ -47,6 +47,58 @@ class CLITools:
             # Set default headers
             HEADERS="-H 'Authorization: Bearer $OBSERVE_API_KEY' -H 'Content-Type: application/json'"
             
+            # Helper function to build query parameters
+            build_query_params() {
+                local params=""
+                
+                # Time range parameters
+                if [ -n "$time_start" ]; then
+                    params="${params}time-start=$time_start&"
+                fi
+                if [ -n "$time_end" ]; then
+                    params="${params}time-end=$time_end&"
+                fi
+                if [ -n "$time_preset" ]; then
+                    params="${params}time-preset=$time_preset&"
+                fi
+                
+                # Filter parameters
+                if [ -n "$filter" ]; then
+                    params="${params}filter=$filter&"
+                fi
+                if [ -n "$filter_column" ] && [ -n "$filter_value" ]; then
+                    if [ -n "$filter_operator" ]; then
+                        params="${params}filter=$filter_column|$filter_operator|$filter_value&"
+                    else
+                        params="${params}filter-$filter_column=$filter_value&"
+                    fi
+                fi
+                
+                # OPAL parameter
+                if [ -n "$opal" ]; then
+                    params="${params}opal=$opal&"
+                fi
+                
+                # Parameter parameters
+                if [ -n "$param_key" ] && [ -n "$param_value" ]; then
+                    params="${params}param-$param_key=$param_value&"
+                fi
+                
+                # Tab parameter
+                if [ -n "$v_tab" ]; then
+                    params="${params}v-tab=$v_tab&"
+                fi
+                
+                # Dashboard parameter
+                if [ -n "$v_dash" ]; then
+                    params="${params}v-dash=$v_dash&"
+                fi
+                
+                # Remove trailing & if present
+                params=$(echo "$params" | sed 's/&$//')
+                echo "$params"
+            }
+            
             # Parse the command to determine operation type
             if [ -z "$command" ]; then
                 echo "Error: Command is required"
@@ -60,6 +112,22 @@ class CLITools:
                 echo "  'events list' - List all events"
                 echo "  'query <dataset-id> <oql-query>' - Execute OQL query"
                 echo "  'api <method> <endpoint> [query-params] [body]' - Custom API call"
+                echo "  'advanced-query <dataset-id> [options]' - Advanced query with filters and parameters"
+                echo ""
+                echo "Advanced URL Parameters:"
+                echo "  Time ranges: time-start, time-end, time-preset"
+                echo "  Filters: filter-<column>=<value>, filter=<column>|<operator>|<value>"
+                echo "  OPAL: opal=<opal-statement>"
+                echo "  Parameters: param-<key>=<value>"
+                echo "  Tabs: v-tab=<tab-name>"
+                echo "  Dashboard: v-dash=<dashboard-id>"
+                echo ""
+                echo "Advanced Query Examples:"
+                echo "  advanced-query dataset-123 --time-preset PAST_1_HOUR"
+                echo "  advanced-query dataset-123 --filter-eq status error"
+                echo "  advanced-query dataset-123 --filter severity != warning"
+                echo "  advanced-query dataset-123 --opal 'filter severity == \"error\"'"
+                echo "  advanced-query dataset-123 --time-start 1686165391864 --time-end 1686251791864"
                 exit 1
             fi
             
@@ -247,9 +315,104 @@ class CLITools:
                     
                     response=$(eval $CURL_CMD)
                     ;;
+                "advanced-query")
+                    if [ -z "$2" ]; then
+                        echo "Error: Advanced query requires dataset ID"
+                        echo "Usage: advanced-query <dataset-id> [options]"
+                        echo ""
+                        echo "Options:"
+                        echo "  --time-start <timestamp>     Start time (Unix epoch or ISO 8601)"
+                        echo "  --time-end <timestamp>       End time (Unix epoch or ISO 8601)"
+                        echo "  --time-preset <preset>       Time preset (TODAY, YESTERDAY, etc.)"
+                        echo "  --filter <column> <operator> <value>  Filter with operator"
+                        echo "  --filter-eq <column> <value> Filter with equals"
+                        echo "  --opal <opal-statement>      OPAL statement"
+                        echo "  --param <key> <value>        Parameter"
+                        echo "  --tab <tab-name>             Tab selection"
+                        echo "  --dash <dashboard-id>        Dashboard selection"
+                        echo ""
+                        echo "Examples:"
+                        echo "  advanced-query dataset-123 --time-preset PAST_1_HOUR"
+                        echo "  advanced-query dataset-123 --filter-eq status error"
+                        echo "  advanced-query dataset-123 --filter severity != warning"
+                        echo "  advanced-query dataset-123 --opal 'filter severity == \"error\"'"
+                        exit 1
+                    fi
+                    
+                    dataset_id="$2"
+                    shift 2
+                    
+                    # Parse advanced options
+                    while [ $# -gt 0 ]; do
+                        case "$1" in
+                            --time-start)
+                                time_start="$2"
+                                shift 2
+                                ;;
+                            --time-end)
+                                time_end="$2"
+                                shift 2
+                                ;;
+                            --time-preset)
+                                time_preset="$2"
+                                shift 2
+                                ;;
+                            --filter)
+                                filter_column="$2"
+                                filter_operator="$3"
+                                filter_value="$4"
+                                shift 4
+                                ;;
+                            --filter-eq)
+                                filter_column="$2"
+                                filter_value="$3"
+                                shift 3
+                                ;;
+                            --opal)
+                                opal="$2"
+                                shift 2
+                                ;;
+                            --param)
+                                param_key="$2"
+                                param_value="$3"
+                                shift 3
+                                ;;
+                            --tab)
+                                v_tab="$2"
+                                shift 2
+                                ;;
+                            --dash)
+                                v_dash="$2"
+                                shift 2
+                                ;;
+                            *)
+                                echo "Error: Unknown option $1"
+                                exit 1
+                                ;;
+                        esac
+                    done
+                    
+                    echo "Executing advanced query on dataset: $dataset_id"
+                    
+                    # Build query parameters
+                    query_params=$(build_query_params)
+                    
+                    # Build the URL
+                    full_url="$OBSERVE_BASE_URL/v1/datasets/$dataset_id"
+                    if [ -n "$query_params" ]; then
+                        full_url="$full_url?$query_params"
+                        echo "Query parameters: $query_params"
+                    fi
+                    
+                    echo "Full URL: $full_url"
+                    echo ""
+                    
+                    # Execute the query
+                    response=$(curl -s -w '\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}s' $HEADERS "$full_url")
+                    ;;
                 *)
                     echo "Error: Unknown operation: $OPERATION"
-                    echo "Supported operations: datasets, monitors, dashboards, resources, events, query, api"
+                    echo "Supported operations: datasets, monitors, dashboards, resources, events, query, api, advanced-query"
                     exit 1
                     ;;
             esac
