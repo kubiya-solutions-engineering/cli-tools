@@ -41,7 +41,7 @@ class DatadogCLITool(Tool):
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
     
-    def __init__(self, name, description, content, args=None, image="datadog/cli:latest"):
+    def __init__(self, name, description, content, args=None, image="datadog/cli:latest", with_files=None):
         content = content
         
         super().__init__(
@@ -53,7 +53,8 @@ class DatadogCLITool(Tool):
             icon_url=DATADOG_CLI_ICON_URL,
             type="docker",
             secrets=["DD_API_KEY", "DD_APP_KEY"],
-            env=["DD_SITE"]
+            env=["DD_SITE"],
+            with_files=with_files
         )
 
     def get_args(self) -> List[Arg]:
