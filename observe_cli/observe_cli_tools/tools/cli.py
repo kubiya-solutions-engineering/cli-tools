@@ -305,7 +305,7 @@ class CLITools:
                 URL="$URL?$QUERY_PARAMS"
             fi
             
-            echo 'Executing query: '"$opal_query"
+            echo "Executing query: $opal_query"
             echo ""
             
             # Execute query
