@@ -135,7 +135,7 @@ class CLITools:
                     query: {
                         stages: [
                             {
-                                input: [{datasetId: $datasetId, name: "main"}],
+                                input: [{inputName: "main", datasetId: $datasetId}],
                                 stageID: "main",
                                 pipeline: $pipeline
                             }
