@@ -76,11 +76,14 @@ class CLITools:
             fi
             
             # Debug: Show the structure of the first item
+            echo "=== Debug: Response structure ==="
+            echo "$RESPONSE" | jq 'keys' | head -10
+            echo ""
             echo "=== Debug: First dataset structure ==="
-            echo "$RESPONSE" | jq '.[0] // .data[0] // "No data found"' | head -20
+            echo "$RESPONSE" | jq '.data[0] // .[0] // "No data found"' | head -20
             echo ""
             
-            # Extract datasets array
+            # Extract datasets array - try .data first, then fallback to root
             DATASETS=$(echo "$RESPONSE" | jq -r '.data // . // []')
             
             # Get total count
