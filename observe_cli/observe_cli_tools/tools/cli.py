@@ -176,7 +176,9 @@ class CLITools:
             fi
             
             # Build query payload
-            QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$FULL_DATASET_ID'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
+            # Escape quotes in the OPAL query for JSON
+            ESCAPED_QUERY=$(echo "$opal_query" | sed 's/"/\\"/g')
+            QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$FULL_DATASET_ID'"}], "stageID": "main", "pipeline": "'$ESCAPED_QUERY'"}]}}'
             
             # Build query parameters
             QUERY_PARAMS=""
