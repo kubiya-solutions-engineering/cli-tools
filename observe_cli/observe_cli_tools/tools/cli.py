@@ -139,10 +139,10 @@ class CLITools:
                 DATASETS=$(echo "$DATASET_RESPONSE" | jq -r '.data // . // []')
                 
                 # Search for datasets matching the search term (case insensitive)
-                MATCHING_DATASETS=$(echo "$DATASETS" | jq -r --arg search "$dataset_id" '.[] | select(.config.name | ascii_downcase | contains($search | ascii_downcase)) | {id: .meta.id, name: .config.name, type: .state.kind}')
+                MATCHING_DATASETS=$(echo "$DATASETS" | jq -r --arg search "$dataset_id" '.[] | select(.config.name | ascii_downcase | contains($search | ascii_downcase)) | {id: .meta.id, name: .config.name, type: .state.kind}' | jq -s '.')
                 
                 # Count matches
-                MATCH_COUNT=$(echo "$MATCHING_DATASETS" | jq -s length)
+                MATCH_COUNT=$(echo "$MATCHING_DATASETS" | jq length)
                 
                 if [ "$MATCH_COUNT" -eq 0 ]; then
                     echo "No datasets found matching '$dataset_id'"
