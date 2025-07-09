@@ -85,10 +85,10 @@ class CLITools:
         )
 
     def execute_opal_query(self) -> ObserveCLITool:
-        """Execute OPAL queries on datasets."""
+        """Execute OPAL queries on datasets with smart dataset selection."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets with optional time parameters",
+            description="Execute OPAL queries on Observe datasets. Can search by dataset name or use dataset ID directly.",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -111,12 +111,62 @@ class CLITools:
                 apk add --no-cache jq curl >/dev/null 2>&1
             fi
             
-            # Convert numeric ID to full dataset ID if needed
+            # Determine if dataset_id is a numeric ID, full ID, or a name search
             if [[ "$dataset_id" =~ ^[0-9]+$ ]]; then
+                # Numeric ID - convert to full ID
                 FULL_DATASET_ID="o::$OBSERVE_CUSTOMER_ID:dataset:$dataset_id"
                 echo "Converting numeric ID $dataset_id to full ID: $FULL_DATASET_ID"
-            else
+            elif [[ "$dataset_id" =~ ^o::.*:dataset:.* ]]; then
+                # Full dataset ID - use as is
                 FULL_DATASET_ID="$dataset_id"
+            else
+                # Treat as dataset name search
+                echo "Searching for dataset: $dataset_id"
+                
+                # Get all datasets
+                DATASET_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
+                DATASET_RESPONSE=$(curl -s "$DATASET_URL" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json")
+                
+                # Check if response is valid JSON
+                if ! echo "$DATASET_RESPONSE" | jq empty 2>/dev/null; then
+                    echo "Error: Invalid JSON response from dataset API"
+                    exit 1
+                fi
+                
+                # Extract datasets array
+                DATASETS=$(echo "$DATASET_RESPONSE" | jq -r '.data // . // []')
+                
+                # Search for datasets matching the search term (case insensitive)
+                MATCHING_DATASETS=$(echo "$DATASETS" | jq -r --arg search "$dataset_id" '.[] | select(.config.name | ascii_downcase | contains($search | ascii_downcase)) | {id: .meta.id, name: .config.name, type: .state.kind}')
+                
+                # Count matches
+                MATCH_COUNT=$(echo "$MATCHING_DATASETS" | jq -s length)
+                
+                if [ "$MATCH_COUNT" -eq 0 ]; then
+                    echo "No datasets found matching '$dataset_id'"
+                    echo ""
+                    echo "Available datasets containing similar terms:"
+                    echo "$DATASETS" | jq -r '.[] | .config.name' | grep -i "$dataset_id" | head -10 || echo "No similar datasets found"
+                    exit 1
+                fi
+                
+                if [ "$MATCH_COUNT" -gt 1 ]; then
+                    echo "Found $MATCH_COUNT datasets matching '$dataset_id':"
+                    echo "$MATCHING_DATASETS" | jq -r '.[] | "\(.id) - \(.name) (\(.type))"'
+                    echo ""
+                    echo "Please be more specific with your search term or use the dataset ID directly."
+                    exit 1
+                fi
+                
+                # Get the single matching dataset
+                FULL_DATASET_ID=$(echo "$MATCHING_DATASETS" | jq -r '.[0].id')
+                DATASET_NAME=$(echo "$MATCHING_DATASETS" | jq -r '.[0].name')
+                DATASET_TYPE=$(echo "$MATCHING_DATASETS" | jq -r '.[0].type')
+                
+                echo "Found dataset: $DATASET_NAME ($DATASET_TYPE)"
+                echo "Dataset ID: $FULL_DATASET_ID"
             fi
             
             # Set default query if none provided
@@ -148,6 +198,9 @@ class CLITools:
                 URL="$URL?$QUERY_PARAMS"
             fi
             
+            echo "Executing query: $opal_query"
+            echo ""
+            
             # Execute query
             RESPONSE=$(curl -s "$URL" \
                 --request POST \
@@ -166,7 +219,7 @@ class CLITools:
             echo "$RESPONSE" | jq '.'
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID (numeric like 41231950 or full ID)", required=True),
+                Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor')", required=True),
                 Arg(name="opal_query", description="OPAL query string (default: 'limit 10', examples: 'filter severity == \"error\"', 'limit 5')", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
