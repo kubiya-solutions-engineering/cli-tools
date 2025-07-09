@@ -313,7 +313,7 @@ class CLITools:
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
-                Arg(name="opal_query", description="OPAL query string. The tool will automatically handle quote escaping. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'. The tool sanitizes JSON input automatically.", required=False),
+                Arg(name="opal_query", description="OPAL query string. REQUIRED: Pass as a JSON string with proper escaping (e.g., \"filter severity == \\\"error\\\"\"). Do NOT use unescaped double quotes. Examples: \"filter severity == \\\"error\\\"\", \"filter status == \\\"500\\\" | limit 20\", \"limit 10\". For error checking, use: \"filter severity == \\\"error\\\"\".", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
