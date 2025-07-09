@@ -208,32 +208,22 @@ class CLITools:
                 fi
             fi
             
-            # Build query payload using jq to properly escape JSON
-            # Use a temporary file to avoid shell quoting issues
-            TEMP_QUERY=$(mktemp)
-            echo "$opal_query" > "$TEMP_QUERY"
-            
+            # Build query payload - properly escape the OPAL query for JSON using jq
             QUERY_PAYLOAD=$(jq -n \
                 --arg datasetId "$FULL_DATASET_ID" \
-                --slurpfile pipeline "$TEMP_QUERY" \
-                '{
-                    "query": {
-                        "stages": [
-                            {
-                                "input": [{"datasetId": $datasetId, "name": "main"}],
-                                "stageID": "main",
-                                "pipeline": $pipeline[0]
-                            }
-                        ]
-                    }
-                }')
+                --arg pipeline "$opal_query" \
+                '{"query":{"stages":[{"input":[{"datasetId":$datasetId,"name":"main"}],"stageID":"main","pipeline":$pipeline}]}}' 2>/dev/null)
             
-            # Clean up temp file
-            rm -f "$TEMP_QUERY"
+            # Fallback if jq fails
+            if [ $? -ne 0 ]; then
+                # Use printf for safer string handling
+                ESCAPED_QUERY=$(printf '%s' "$opal_query" | sed 's/"/\\"/g')
+                QUERY_PAYLOAD='{"query":{"stages":[{"input":[{"datasetId":"'"$FULL_DATASET_ID"'","name":"main"}],"stageID":"main","pipeline":"'"$ESCAPED_QUERY"'"}]}}'
+            fi
             
             # Debug: Show the query payload
             echo "Query payload:"
-            echo "$QUERY_PAYLOAD" | jq '.'
+            echo "$QUERY_PAYLOAD" | jq '.' 2>/dev/null || echo "$QUERY_PAYLOAD"
             echo ""
             
             # Build query parameters
@@ -256,7 +246,7 @@ class CLITools:
                 URL="$URL?$QUERY_PARAMS"
             fi
             
-            echo "Executing query: $opal_query"
+            echo 'Executing query: '"$opal_query"
             echo ""
             
             # Execute query
@@ -274,7 +264,7 @@ class CLITools:
             fi
             
             # Show formatted response
-            echo "$RESPONSE" | jq '.'
+            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor')", required=True),
