@@ -209,20 +209,27 @@ class CLITools:
             fi
             
             # Build query payload using jq to properly escape JSON
+            # Use a temporary file to avoid shell quoting issues
+            TEMP_QUERY=$(mktemp)
+            echo "$opal_query" > "$TEMP_QUERY"
+            
             QUERY_PAYLOAD=$(jq -n \
                 --arg datasetId "$FULL_DATASET_ID" \
-                --arg pipeline "$opal_query" \
+                --slurpfile pipeline "$TEMP_QUERY" \
                 '{
                     "query": {
                         "stages": [
                             {
                                 "input": [{"datasetId": $datasetId, "name": "main"}],
                                 "stageID": "main",
-                                "pipeline": $pipeline
+                                "pipeline": $pipeline[0]
                             }
                         ]
                     }
                 }')
+            
+            # Clean up temp file
+            rm -f "$TEMP_QUERY"
             
             # Debug: Show the query payload
             echo "Query payload:"
