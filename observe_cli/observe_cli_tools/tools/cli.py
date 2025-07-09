@@ -31,6 +31,12 @@ class CLITools:
             name="observe_list_datasets",
             description="List all datasets in the Observe instance",
             content="""
+            # Install curl if not available
+            if ! command -v curl >/dev/null 2>&1; then
+                echo "Installing curl..."
+                apk add --no-cache curl
+            fi
+            
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
                 echo "Error: OBSERVE_API_KEY environment variable is required"
@@ -63,6 +69,12 @@ class CLITools:
             name="observe_opal_query",
             description="Execute OPAL queries on Observe datasets with optional time parameters",
             content="""
+            # Install curl if not available
+            if ! command -v curl >/dev/null 2>&1; then
+                echo "Installing curl..."
+                apk add --no-cache curl
+            fi
+            
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
                 echo "Error: OBSERVE_API_KEY environment variable is required"
