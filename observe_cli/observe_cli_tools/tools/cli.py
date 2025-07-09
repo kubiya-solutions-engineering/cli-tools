@@ -96,7 +96,7 @@ class CLITools:
         """Execute OPAL queries on datasets with smart dataset selection."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets using jq for proper JSON handling. Can search by dataset name or use dataset ID directly. For checking errors in logs, use: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. The tool uses jq to properly escape and construct JSON payloads.",
+            description="Execute OPAL queries on Observe datasets using jq for proper JSON handling. Can search by dataset name or use dataset ID directly. For checking errors in logs, use: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. The tool uses jq to properly escape and construct JSON payloads and automatically sanitizes input to handle quote issues.",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -208,6 +208,22 @@ class CLITools:
                 echo "No query provided, using default: $opal_query"
             fi
             
+            # Sanitize the opal_query to handle JSON input with unescaped quotes
+            # Handle the case where the AI passes the query with unescaped quotes
+            # First, check if the query starts and ends with quotes (JSON string format)
+            if [[ "$opal_query" =~ ^\".*\"$ ]]; then
+                # Remove outer quotes and unescape inner quotes
+                SANITIZED_QUERY=$(echo "$opal_query" | sed 's/^"//;s/"$//' | sed 's/\\"/"/g')
+            else
+                # Query is already in the correct format
+                SANITIZED_QUERY="$opal_query"
+            fi
+            
+            # Use the sanitized query
+            opal_query="$SANITIZED_QUERY"
+            
+            echo "Sanitized query: $opal_query"
+            
             # Show query formatting help for common patterns
             if echo "$opal_query" | grep -q "filter.*severity.*error"; then
                 echo "Note: Query format looks good for error filtering"
@@ -297,7 +313,7 @@ class CLITools:
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
-                Arg(name="opal_query", description="OPAL query string. Pass as a JSON string with proper escaping. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'. Note: Use double quotes for string values inside the query.", required=False),
+                Arg(name="opal_query", description="OPAL query string. The tool will automatically handle quote escaping. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'. The tool sanitizes JSON input automatically.", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
