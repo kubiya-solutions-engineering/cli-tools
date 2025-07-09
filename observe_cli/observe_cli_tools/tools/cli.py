@@ -96,17 +96,19 @@ class CLITools:
         """Execute OPAL queries on datasets with smart dataset selection (stateless, robust)."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets. Pass the OPAL query, dataset_id, and interval as positional arguments. Example: 'filter severity == \"error\"' o::115742482447:dataset:41041574 1h. The tool uses jq to build the JSON body and is stateless and robust to quoting issues.",
+            description="Execute OPAL queries on Observe datasets. The tool accepts named arguments and converts them to positional arguments for the shell script. Example: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. The tool uses jq to build the JSON body and is stateless and robust to quoting issues.",
             content="""
             #!/bin/sh
             set -e
             
-            opal_query="$1"
-            dataset_id="$2"
-            interval="$3"
+            # Accept named arguments from orchestrator and convert to positional
+            opal_query="$opal_query"
+            dataset_id="$dataset_id"
+            interval="$interval"
             
             if [ -z "$opal_query" ] || [ -z "$dataset_id" ]; then
-                echo "Usage: $0 <opal_query> <dataset_id> [interval]"
+                echo "Error: opal_query and dataset_id are required"
+                echo "Usage: opal_query='<query>' dataset_id='<id>' [interval='<time>']"
                 exit 1
             fi
             
