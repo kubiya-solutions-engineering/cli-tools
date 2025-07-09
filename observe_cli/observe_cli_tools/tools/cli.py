@@ -26,10 +26,10 @@ class CLITools:
             raise
 
     def list_datasets(self) -> ObserveCLITool:
-        """List datasets with clean output and client-side pagination."""
+        """List all datasets with clean output."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List datasets in the Observe instance with clean output and pagination",
+            description="List all datasets in the Observe instance with clean output",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -46,13 +46,6 @@ class CLITools:
             if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
                 apk add --no-cache jq curl >/dev/null 2>&1
             fi
-            
-            # Set pagination defaults
-            PAGE_SIZE=${page_size:-100}
-            PAGE_NUM=${page_num:-1}
-            
-            # Calculate offset
-            OFFSET=$(( (PAGE_NUM - 1) * PAGE_SIZE ))
             
             # Build URL
             URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
@@ -74,32 +67,18 @@ class CLITools:
             # Get total count
             TOTAL_COUNT=$(echo "$DATASETS" | jq length)
             
-            # Show summary only if not the first page or if user requested it
-            if [ "$PAGE_NUM" != "1" ] || [ "$show_summary" = "true" ]; then
+            # Show summary if requested
+            if [ "$show_summary" = "true" ]; then
                 echo "=== Dataset Summary ==="
                 echo "Total datasets: $TOTAL_COUNT"
-                echo "Page: $PAGE_NUM of $(( (TOTAL_COUNT + PAGE_SIZE - 1) / PAGE_SIZE ))"
-                echo "Showing: $((OFFSET + 1)) to $((OFFSET + PAGE_SIZE))"
                 echo "========================"
                 echo ""
             fi
             
-            # Apply pagination using jq
-            PAGINATED_DATA=$(echo "$DATASETS" | jq ".[$OFFSET:$((OFFSET + PAGE_SIZE))]")
-            
-            # Show the datasets in clean format
-            echo "$PAGINATED_DATA" | jq -r '.[] | "\(.meta.id) - \(.config.name) (\(.state.kind))"'
-            
-            # Show pagination hint only if there are more results
-            if [ $TOTAL_COUNT -gt $((OFFSET + PAGE_SIZE)) ]; then
-                echo ""
-                echo "--- More datasets available ---"
-                echo "Next page: page_num=$((PAGE_NUM + 1))"
-            fi
+            # Show all datasets in clean format
+            echo "$DATASETS" | jq -r '.[] | "\(.meta.id) - \(.config.name) (\(.state.kind))"'
             """,
             args=[
-                Arg(name="page_size", description="Number of datasets per page (default: 100)", required=False),
-                Arg(name="page_num", description="Page number to display (default: 1)", required=False),
                 Arg(name="show_summary", description="Show summary info (default: false)", required=False)
             ],
             image="alpine:latest"
