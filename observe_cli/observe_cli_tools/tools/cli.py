@@ -42,10 +42,10 @@ class CLITools:
                 exit 1
             fi
             
-            # Install jq if not available
-            if ! command -v jq >/dev/null 2>&1; then
-                echo "Installing jq..."
-                apk add --no-cache jq
+            # Install required packages if not available
+            if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+                echo "Installing required packages..."
+                apk add --no-cache jq curl
             fi
             
             # Make API call to list datasets
@@ -84,10 +84,10 @@ class CLITools:
                 exit 1
             fi
             
-            # Install jq if not available
-            if ! command -v jq >/dev/null 2>&1; then
-                echo "Installing jq..."
-                apk add --no-cache jq
+            # Install required packages if not available
+            if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+                echo "Installing required packages..."
+                apk add --no-cache jq curl
             fi
             
             # Build query payload
