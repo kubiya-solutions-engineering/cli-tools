@@ -208,6 +208,17 @@ class CLITools:
                 echo "No query provided, using default: $opal_query"
             fi
             
+            # Simple validation for unescaped quotes
+            if echo "$opal_query" | grep -q '"[^"]*"[^"]*"'; then
+                echo "Error: Query contains unescaped quotes. Please escape quotes properly."
+                echo ""
+                echo "Correct format:"
+                echo "  \"filter severity == \\\"error\\\"\""
+                echo ""
+                echo "Current query: $opal_query"
+                exit 1
+            fi
+            
             echo "Query: $opal_query"
             
             # Show query formatting help for common patterns
@@ -299,7 +310,7 @@ class CLITools:
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
-                Arg(name="opal_query", description="OPAL query string. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'.", required=False),
+                Arg(name="opal_query", description="OPAL query string. REQUIRED: Use proper JSON escaping with \\\" for quotes. Examples: 'filter severity == \\\"error\\\"', 'filter status == \\\"500\\\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \\\"error\\\"'.", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
