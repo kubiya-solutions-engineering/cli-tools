@@ -47,6 +47,14 @@ class CLITools:
                 apk add --no-cache jq curl >/dev/null 2>&1
             fi
             
+            # Ensure jq is available
+            if ! command -v jq >/dev/null 2>&1; then
+                echo "Error: jq is required but not available"
+                exit 1
+            fi
+            
+            echo "Using jq for JSON handling and query construction"
+            
             # Build URL
             URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
             
@@ -88,7 +96,7 @@ class CLITools:
         """Execute OPAL queries on datasets with smart dataset selection."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets. Can search by dataset name or use dataset ID directly. For checking errors in logs, use: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'",
+            description="Execute OPAL queries on Observe datasets using jq for proper JSON handling. Can search by dataset name or use dataset ID directly. For checking errors in logs, use: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. The tool uses jq to properly escape and construct JSON payloads.",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -110,6 +118,14 @@ class CLITools:
             if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
                 apk add --no-cache jq curl >/dev/null 2>&1
             fi
+            
+            # Ensure jq is available
+            if ! command -v jq >/dev/null 2>&1; then
+                echo "Error: jq is required but not available"
+                exit 1
+            fi
+            
+            echo "Using jq for JSON handling and query construction"
             
             # Determine if dataset_id is a numeric ID, full ID, or a name search
             if [[ "$dataset_id" =~ ^[0-9]+$ ]]; then
@@ -213,22 +229,30 @@ class CLITools:
                 fi
             fi
             
-            # Build query payload - properly escape the OPAL query for JSON using jq
+            # Build query payload using jq for proper JSON handling
             QUERY_PAYLOAD=$(jq -n \
                 --arg datasetId "$FULL_DATASET_ID" \
                 --arg pipeline "$opal_query" \
-                '{"query":{"stages":[{"input":[{"datasetId":$datasetId,"name":"main"}],"stageID":"main","pipeline":$pipeline}]}}' 2>/dev/null)
-            
-            # Fallback if jq fails
-            if [ $? -ne 0 ]; then
-                # Use printf for safer string handling
-                ESCAPED_QUERY=$(printf '%s' "$opal_query" | sed 's/"/\\"/g')
-                QUERY_PAYLOAD=$(printf '{"query":{"stages":[{"input":[{"datasetId":"%s","name":"main"}],"stageID":"main","pipeline":"%s"}]}}' "$FULL_DATASET_ID" "$ESCAPED_QUERY")
-            fi
+                '{
+                    "query": {
+                        "stages": [
+                            {
+                                "input": [
+                                    {
+                                        "datasetId": $datasetId,
+                                        "name": "main"
+                                    }
+                                ],
+                                "stageID": "main",
+                                "pipeline": $pipeline
+                            }
+                        ]
+                    }
+                }')
             
             # Debug: Show the query payload
             echo "Query payload:"
-            echo "$QUERY_PAYLOAD" | jq '.' 2>/dev/null || echo "$QUERY_PAYLOAD"
+            echo "$QUERY_PAYLOAD" | jq '.'
             echo ""
             
             # Build query parameters
@@ -268,12 +292,12 @@ class CLITools:
                 exit 1
             fi
             
-            # Show formatted response
-            echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+            # Show formatted response using jq
+            echo "$RESPONSE" | jq '.'
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
-                Arg(name="opal_query", description="OPAL query string. Use single quotes around the entire query and double quotes for string values inside. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'", required=False),
+                Arg(name="opal_query", description="OPAL query string. Pass as a JSON string with proper escaping. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'. Note: Use double quotes for string values inside the query.", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
