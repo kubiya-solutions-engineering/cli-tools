@@ -106,19 +106,27 @@ class CLITools:
                 exit 1
             fi
             
-            if [ -z "$opal_query" ]; then
-                echo "Error: opal_query parameter is required"
-                exit 1
+            # Install required packages silently if not available
+            if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+                apk add --no-cache jq curl >/dev/null 2>&1
             fi
             
-            # Install required packages if not available
-            if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
-                echo "Installing required packages..."
-                apk add --no-cache jq curl
+            # Convert numeric ID to full dataset ID if needed
+            if [[ "$dataset_id" =~ ^[0-9]+$ ]]; then
+                FULL_DATASET_ID="o::$OBSERVE_CUSTOMER_ID:dataset:$dataset_id"
+                echo "Converting numeric ID $dataset_id to full ID: $FULL_DATASET_ID"
+            else
+                FULL_DATASET_ID="$dataset_id"
+            fi
+            
+            # Set default query if none provided
+            if [ -z "$opal_query" ]; then
+                opal_query="limit 10"
+                echo "No query provided, using default: $opal_query"
             fi
             
             # Build query payload
-            QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$dataset_id'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
+            QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$FULL_DATASET_ID'"}], "stageID": "main", "pipeline": "'$opal_query'"}]}}'
             
             # Build query parameters
             QUERY_PARAMS=""
@@ -140,25 +148,26 @@ class CLITools:
                 URL="$URL?$QUERY_PARAMS"
             fi
             
-            # Echo the curl command for debugging
-            echo "Executing curl command:"
-            echo "curl -s \"$URL\" \\"
-            echo "  --request POST \\"
-            echo "  --header \"Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY\" \\"
-            echo "  --header \"Content-Type: application/json\" \\"
-            echo "  --data \"$QUERY_PAYLOAD\""
-            echo ""
-            
             # Execute query
-            curl -s "$URL" \
+            RESPONSE=$(curl -s "$URL" \
                 --request POST \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
-                --data "$QUERY_PAYLOAD" | jq '.' 2>/dev/null || echo "Error: Failed to parse response"
+                --data "$QUERY_PAYLOAD")
+            
+            # Check if response is valid JSON
+            if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                echo "Error: Invalid JSON response from API"
+                echo "Response: $RESPONSE"
+                exit 1
+            fi
+            
+            # Show formatted response
+            echo "$RESPONSE" | jq '.'
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID to query", required=True),
-                Arg(name="opal_query", description="OPAL query string (e.g., 'filter severity == \"error\"')", required=True),
+                Arg(name="dataset_id", description="Dataset ID (numeric like 41231950 or full ID)", required=True),
+                Arg(name="opal_query", description="OPAL query string (default: 'limit 10', examples: 'filter severity == \"error\"', 'limit 5')", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s)", required=False)
