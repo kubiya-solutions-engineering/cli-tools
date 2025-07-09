@@ -48,6 +48,13 @@ class CLITools:
                 apk add --no-cache jq curl
             fi
             
+            # Echo the curl command for debugging
+            echo "Executing curl command:"
+            echo "curl -s \"https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset\" \\"
+            echo "  --header \"Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY\" \\"
+            echo "  --header \"Content-Type: application/json\""
+            echo ""
+            
             # Make API call to list datasets
             curl -s "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
@@ -112,6 +119,15 @@ class CLITools:
             if [ -n "$QUERY_PARAMS" ]; then
                 URL="$URL?$QUERY_PARAMS"
             fi
+            
+            # Echo the curl command for debugging
+            echo "Executing curl command:"
+            echo "curl -s \"$URL\" \\"
+            echo "  --request POST \\"
+            echo "  --header \"Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY\" \\"
+            echo "  --header \"Content-Type: application/json\" \\"
+            echo "  --data \"$QUERY_PAYLOAD\""
+            echo ""
             
             # Execute query
             curl -s "$URL" \
