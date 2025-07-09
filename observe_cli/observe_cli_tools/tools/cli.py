@@ -175,10 +175,21 @@ class CLITools:
                 echo "No query provided, using default: $opal_query"
             fi
             
-            # Build query payload
-            # Escape quotes in the OPAL query for JSON
-            ESCAPED_QUERY=$(echo "$opal_query" | sed 's/"/\\"/g')
-            QUERY_PAYLOAD='{"query": {"stages": [{"input": [{"datasetId": "'$FULL_DATASET_ID'"}], "stageID": "main", "pipeline": "'$ESCAPED_QUERY'"}]}}'
+            # Build query payload using jq to properly escape JSON
+            QUERY_PAYLOAD=$(jq -n \
+                --arg datasetId "$FULL_DATASET_ID" \
+                --arg pipeline "$opal_query" \
+                '{
+                    "query": {
+                        "stages": [
+                            {
+                                "input": [{"datasetId": $datasetId}],
+                                "stageID": "main",
+                                "pipeline": $pipeline
+                            }
+                        ]
+                    }
+                }')
             
             # Build query parameters
             QUERY_PARAMS=""
