@@ -127,50 +127,35 @@ class CLITools:
                 exit 1
             fi
             
-            # Build JSON body with jq
-            if [ -n "$interval" ]; then
-                # Include interval in the JSON body
-                json_body=$(jq -n \
-                    --arg datasetId "$dataset_id" \
-                    --arg pipeline "$opal_query" \
-                    --arg interval "$interval" \
-                    '{
-                        query: {
-                            stages: [
-                                {
-                                    input: [{datasetId: $datasetId, name: "main"}],
-                                    stageID: "main",
-                                    pipeline: $pipeline
-                                }
-                            ]
-                        },
-                        interval: $interval
-                    }')
-            else
-                # Don't include interval in the JSON body
-                json_body=$(jq -n \
-                    --arg datasetId "$dataset_id" \
-                    --arg pipeline "$opal_query" \
-                    '{
-                        query: {
-                            stages: [
-                                {
-                                    input: [{datasetId: $datasetId, name: "main"}],
-                                    stageID: "main",
-                                    pipeline: $pipeline
-                                }
-                            ]
-                        }
-                    }')
-            fi
+            # Build JSON body with jq (without interval in body)
+            json_body=$(jq -n \
+                --arg datasetId "$dataset_id" \
+                --arg pipeline "$opal_query" \
+                '{
+                    query: {
+                        stages: [
+                            {
+                                input: [{datasetId: $datasetId, name: "main"}],
+                                stageID: "main",
+                                pipeline: $pipeline
+                            }
+                        ]
+                    }
+                }')
             
             # Debug: Show the query payload
             echo "Query payload:"
             echo "$json_body" | jq '.'
             echo ""
             
-            # Build URL
+            # Build URL with query parameters
             URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+            if [ -n "$interval" ]; then
+                URL="$URL?interval=$interval"
+            fi
+            
+            echo "URL: $URL"
+            echo ""
             
             # Execute query
             RESPONSE=$(curl -s "$URL" \
