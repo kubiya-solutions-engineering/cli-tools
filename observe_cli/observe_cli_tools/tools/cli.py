@@ -26,10 +26,10 @@ class CLITools:
             raise
 
     def list_datasets(self) -> ObserveCLITool:
-        """List all datasets."""
+        """List datasets with pagination and output limiting."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List all datasets in the Observe instance",
+            description="List datasets in the Observe instance with pagination and output limiting for testing",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -48,19 +48,73 @@ class CLITools:
                 apk add --no-cache jq curl
             fi
             
+            # Set default values for pagination
+            LIMIT=${limit:-10}
+            OFFSET=${offset:-0}
+            
+            # Build URL with query parameters
+            URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?limit=$LIMIT&offset=$OFFSET"
+            
             # Echo the curl command for debugging
             echo "Executing curl command:"
-            echo "curl -s \"https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset\" \\"
+            echo "curl -s \"$URL\" \\"
             echo "  --header \"Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY\" \\"
             echo "  --header \"Content-Type: application/json\""
             echo ""
+            echo "Parameters: limit=$LIMIT, offset=$OFFSET"
+            echo ""
             
             # Make API call to list datasets
-            curl -s "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset" \
+            RESPONSE=$(curl -s "$URL" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                --header "Content-Type: application/json" | jq '.' 2>/dev/null || echo "Error: Failed to parse response"
+                --header "Content-Type: application/json")
+            
+            # Check if response is valid JSON
+            if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                echo "Error: Invalid JSON response from API"
+                echo "Response: $RESPONSE"
+                exit 1
+            fi
+            
+            # Extract total count and datasets
+            TOTAL_COUNT=$(echo "$RESPONSE" | jq -r '.total // 0')
+            DATASETS=$(echo "$RESPONSE" | jq -r '.data // []')
+            
+            echo "=== Dataset Summary ==="
+            echo "Total datasets available: $TOTAL_COUNT"
+            echo "Showing datasets: $OFFSET to $((OFFSET + LIMIT))"
+            echo "========================"
+            echo ""
+            
+            # Format output based on format parameter
+            if [ "$format" = "summary" ]; then
+                # Show a compact summary
+                echo "$DATASETS" | jq -r '.[] | "\(.id) - \(.name // "unnamed") (\(.type // "unknown"))"'
+            elif [ "$format" = "detailed" ]; then
+                # Show detailed information
+                echo "$DATASETS" | jq -r '.[] | "ID: \(.id)\nName: \(.name // "unnamed")\nType: \(.type // "unknown")\nDescription: \(.description // "no description")\n---"'
+            else
+                # Default: show key fields in a table format
+                echo "$DATASETS" | jq -r '.[] | "\(.id)|\(.name // "unnamed")|\(.type // "unknown")|\(.description // "no description")"' | \
+                while IFS='|' read -r id name type desc; do
+                    printf "%-20s %-30s %-15s %s\n" "$id" "$name" "$type" "$desc"
+                done
+            fi
+            
+            # Show pagination info if there are more results
+            if [ $TOTAL_COUNT -gt $((OFFSET + LIMIT)) ]; then
+                echo ""
+                echo "=== Pagination Info ==="
+                echo "To get next page, use: offset=$((OFFSET + LIMIT))"
+                echo "To get more results per page, use: limit=<number>"
+                echo "======================="
+            fi
             """,
-            args=[],
+            args=[
+                Arg(name="limit", description="Number of datasets to return (default: 10, max: 100)", required=False),
+                Arg(name="offset", description="Number of datasets to skip for pagination (default: 0)", required=False),
+                Arg(name="format", description="Output format: summary, detailed, or table (default: table)", required=False)
+            ],
             image="alpine:latest"
         )
 
