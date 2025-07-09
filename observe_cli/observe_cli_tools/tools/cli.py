@@ -192,6 +192,13 @@ class CLITools:
                 echo "No query provided, using default: $opal_query"
             fi
             
+            # Check for common OPAL syntax errors
+            if echo "$opal_query" | grep -q "filter.*=.*\""; then
+                echo "Warning: You may want to use '==' for equality comparison instead of '='"
+                echo "Example: 'filter severity == \"error\"' instead of 'filter severity = \"error\"'"
+                echo ""
+            fi
+            
             # For Event datasets, we need a time range. Set default interval if none provided
             if [ -z "$interval" ] && [ -z "$start_time" ] && [ -z "$end_time" ]; then
                 # Check if this is an Event dataset by looking at the dataset type
@@ -216,6 +223,11 @@ class CLITools:
                         ]
                     }
                 }')
+            
+            # Debug: Show the query payload
+            echo "Query payload:"
+            echo "$QUERY_PAYLOAD" | jq '.'
+            echo ""
             
             # Build query parameters
             QUERY_PARAMS=""
