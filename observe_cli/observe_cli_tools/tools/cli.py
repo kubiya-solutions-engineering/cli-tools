@@ -208,35 +208,7 @@ class CLITools:
                 echo "No query provided, using default: $opal_query"
             fi
             
-            # Validate the opal_query for unescaped quotes
-            # Check if the query contains any unescaped double quotes
-            if echo "$opal_query" | grep -q '"' && ! echo "$opal_query" | grep -q '\\"'; then
-                echo "Error: Invalid query format. The query contains unescaped double quotes."
-                echo ""
-                echo "Correct format examples:"
-                echo "  \"filter severity == \\\"error\\\"\""
-                echo "  \"filter status == \\\"500\\\" | limit 20\""
-                echo "  \"limit 10\""
-                echo ""
-                echo "Note: Use \\\" for double quotes inside the query string."
-                exit 1
-            fi
-            
-            # Sanitize the opal_query to handle JSON input with unescaped quotes
-            # Handle the case where the AI passes the query with unescaped quotes
-            # First, check if the query starts and ends with quotes (JSON string format)
-            if [[ "$opal_query" =~ ^\".*\"$ ]]; then
-                # Remove outer quotes and unescape inner quotes
-                SANITIZED_QUERY=$(echo "$opal_query" | sed 's/^"//;s/"$//' | sed 's/\\"/"/g')
-            else
-                # Query is already in the correct format
-                SANITIZED_QUERY="$opal_query"
-            fi
-            
-            # Use the sanitized query
-            opal_query="$SANITIZED_QUERY"
-            
-            echo "Sanitized query: $opal_query"
+            echo "Query: $opal_query"
             
             # Show query formatting help for common patterns
             if echo "$opal_query" | grep -q "filter.*severity.*error"; then
@@ -327,7 +299,7 @@ class CLITools:
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
-                Arg(name="opal_query", description="OPAL query string. REQUIRED: Pass as a JSON string with proper escaping (e.g., \"filter severity == \\\"error\\\"\"). Do NOT use unescaped double quotes. Examples: \"filter severity == \\\"error\\\"\", \"filter status == \\\"500\\\" | limit 20\", \"limit 10\". For error checking, use: \"filter severity == \\\"error\\\"\".", required=False),
+                Arg(name="opal_query", description="OPAL query string. Examples: 'filter severity == \"error\"', 'filter status == \"500\" | limit 20', 'limit 10'. For error checking, use: 'filter severity == \"error\"'.", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
