@@ -209,7 +209,7 @@ class CLITools:
                     "query": {
                         "stages": [
                             {
-                                "input": [{"datasetId": $datasetId}],
+                                "input": [{"datasetId": $datasetId, "name": "main"}],
                                 "stageID": "main",
                                 "pipeline": $pipeline
                             }
