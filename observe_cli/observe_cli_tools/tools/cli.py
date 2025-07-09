@@ -26,10 +26,10 @@ class CLITools:
             raise
 
     def list_datasets(self) -> ObserveCLITool:
-        """List datasets with basic curl and output limiting."""
+        """List datasets with basic curl."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List datasets in the Observe instance with basic curl and output limiting",
+            description="List datasets in the Observe instance with basic curl",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -48,14 +48,10 @@ class CLITools:
                 apk add --no-cache jq curl
             fi
             
-            # Set limit for testing (default 5)
-            LIMIT=${limit:-5}
-            
-            # Build URL with limit
-            URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?limit=$LIMIT"
+            # Build URL
+            URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
             
             echo "Making request to: $URL"
-            echo "Limit: $LIMIT"
             echo ""
             
             # Make API call and get raw response
@@ -69,15 +65,13 @@ class CLITools:
             
             # If response is valid JSON, show formatted version
             if echo "$RESPONSE" | jq empty 2>/dev/null; then
-                echo "Formatted JSON (first $LIMIT items):"
-                echo "$RESPONSE" | jq '.' | head -50
+                echo "Formatted JSON:"
+                echo "$RESPONSE" | jq '.'
             else
                 echo "Response is not valid JSON"
             fi
             """,
-            args=[
-                Arg(name="limit", description="Number of datasets to return (default: 5)", required=False)
-            ],
+            args=[],
             image="alpine:latest"
         )
 
