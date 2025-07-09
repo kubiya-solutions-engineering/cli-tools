@@ -26,10 +26,10 @@ class CLITools:
             raise
 
     def list_datasets(self) -> ObserveCLITool:
-        """List datasets with basic curl."""
+        """List datasets with basic curl and client-side pagination."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List datasets in the Observe instance with basic curl",
+            description="List datasets in the Observe instance with client-side pagination",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -48,10 +48,18 @@ class CLITools:
                 apk add --no-cache jq curl
             fi
             
+            # Set pagination defaults
+            PAGE_SIZE=${page_size:-10}
+            PAGE_NUM=${page_num:-1}
+            
+            # Calculate offset
+            OFFSET=$(( (PAGE_NUM - 1) * PAGE_SIZE ))
+            
             # Build URL
             URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
             
             echo "Making request to: $URL"
+            echo "Page: $PAGE_NUM, Page Size: $PAGE_SIZE, Offset: $OFFSET"
             echo ""
             
             # Make API call and get raw response
@@ -59,19 +67,47 @@ class CLITools:
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json")
             
-            echo "Raw response:"
-            echo "$RESPONSE" | head -20
+            # Check if response is valid JSON
+            if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                echo "Error: Invalid JSON response from API"
+                echo "Raw response:"
+                echo "$RESPONSE" | head -10
+                exit 1
+            fi
+            
+            # Extract datasets array
+            DATASETS=$(echo "$RESPONSE" | jq -r '.data // . // []')
+            
+            # Get total count
+            TOTAL_COUNT=$(echo "$DATASETS" | jq length)
+            
+            echo "=== Dataset Summary ==="
+            echo "Total datasets available: $TOTAL_COUNT"
+            echo "Page: $PAGE_NUM of $(( (TOTAL_COUNT + PAGE_SIZE - 1) / PAGE_SIZE ))"
+            echo "Showing datasets: $((OFFSET + 1)) to $((OFFSET + PAGE_SIZE))"
+            echo "========================"
             echo ""
             
-            # If response is valid JSON, show formatted version
-            if echo "$RESPONSE" | jq empty 2>/dev/null; then
-                echo "Formatted JSON:"
-                echo "$RESPONSE" | jq '.'
-            else
-                echo "Response is not valid JSON"
+            # Apply pagination using jq
+            PAGINATED_DATA=$(echo "$DATASETS" | jq ".[$OFFSET:$((OFFSET + PAGE_SIZE))]")
+            
+            # Show the paginated data
+            echo "Datasets:"
+            echo "$PAGINATED_DATA" | jq -r '.[] | "\(.id // "null") - \(.name // "unnamed") (\(.type // "unknown"))"'
+            
+            # Show pagination info
+            if [ $TOTAL_COUNT -gt $((OFFSET + PAGE_SIZE)) ]; then
+                echo ""
+                echo "=== Pagination Info ==="
+                echo "To get next page, use: page_num=$((PAGE_NUM + 1))"
+                echo "To change page size, use: page_size=<number>"
+                echo "======================="
             fi
             """,
-            args=[],
+            args=[
+                Arg(name="page_size", description="Number of datasets per page (default: 10)", required=False),
+                Arg(name="page_num", description="Page number to display (default: 1)", required=False)
+            ],
             image="alpine:latest"
         )
 
