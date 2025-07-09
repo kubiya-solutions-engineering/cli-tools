@@ -128,22 +128,41 @@ class CLITools:
             fi
             
             # Build JSON body with jq
-            json_body=$(jq -n \
-                --arg datasetId "$dataset_id" \
-                --arg pipeline "$opal_query" \
-                --arg interval "$interval" \
-                '{
-                    query: {
-                        stages: [
-                            {
-                                input: [{datasetId: $datasetId, name: "main"}],
-                                stageID: "main",
-                                pipeline: $pipeline
-                            }
-                        ]
-                    },
-                    interval: $interval
-                }')
+            if [ -n "$interval" ]; then
+                # Include interval in the JSON body
+                json_body=$(jq -n \
+                    --arg datasetId "$dataset_id" \
+                    --arg pipeline "$opal_query" \
+                    --arg interval "$interval" \
+                    '{
+                        query: {
+                            stages: [
+                                {
+                                    input: [{datasetId: $datasetId, name: "main"}],
+                                    stageID: "main",
+                                    pipeline: $pipeline
+                                }
+                            ]
+                        },
+                        interval: $interval
+                    }')
+            else
+                # Don't include interval in the JSON body
+                json_body=$(jq -n \
+                    --arg datasetId "$dataset_id" \
+                    --arg pipeline "$opal_query" \
+                    '{
+                        query: {
+                            stages: [
+                                {
+                                    input: [{datasetId: $datasetId, name: "main"}],
+                                    stageID: "main",
+                                    pipeline: $pipeline
+                                }
+                            ]
+                        }
+                    }')
+            fi
             
             # Debug: Show the query payload
             echo "Query payload:"
