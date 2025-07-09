@@ -113,9 +113,26 @@ class CLITools:
             
             # Determine if dataset_id is a numeric ID, full ID, or a name search
             if [[ "$dataset_id" =~ ^[0-9]+$ ]]; then
-                # Numeric ID - convert to full ID
+                # Numeric ID - convert to full ID and get dataset info
                 FULL_DATASET_ID="o::$OBSERVE_CUSTOMER_ID:dataset:$dataset_id"
                 echo "Converting numeric ID $dataset_id to full ID: $FULL_DATASET_ID"
+                
+                # Get dataset details to determine type
+                DATASET_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
+                DATASET_RESPONSE=$(curl -s "$DATASET_URL" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json")
+                
+                if echo "$DATASET_RESPONSE" | jq empty 2>/dev/null; then
+                    DATASETS=$(echo "$DATASET_RESPONSE" | jq -r '.data // . // []')
+                    DATASET_INFO=$(echo "$DATASETS" | jq -r --arg id "$FULL_DATASET_ID" '.[] | select(.meta.id == $id) | {name: .config.name, type: .state.kind}')
+                    
+                    if [ -n "$DATASET_INFO" ]; then
+                        DATASET_NAME=$(echo "$DATASET_INFO" | jq -r '.name')
+                        DATASET_TYPE=$(echo "$DATASET_INFO" | jq -r '.type')
+                        echo "Found dataset: $DATASET_NAME ($DATASET_TYPE)"
+                    fi
+                fi
             elif [[ "$dataset_id" =~ ^o::.*:dataset:.* ]]; then
                 # Full dataset ID - use as is
                 FULL_DATASET_ID="$dataset_id"
@@ -173,6 +190,15 @@ class CLITools:
             if [ -z "$opal_query" ]; then
                 opal_query="limit 10"
                 echo "No query provided, using default: $opal_query"
+            fi
+            
+            # For Event datasets, we need a time range. Set default interval if none provided
+            if [ -z "$interval" ] && [ -z "$start_time" ] && [ -z "$end_time" ]; then
+                # Check if this is an Event dataset by looking at the dataset type
+                if [ -n "$DATASET_TYPE" ] && [ "$DATASET_TYPE" = "Event" ]; then
+                    interval="1h"
+                    echo "Event dataset detected, setting default interval: $interval"
+                fi
             fi
             
             # Build query payload using jq to properly escape JSON
