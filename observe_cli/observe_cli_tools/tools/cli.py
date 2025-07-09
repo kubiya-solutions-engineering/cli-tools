@@ -230,6 +230,20 @@ class CLITools:
             else
                 echo "Formatted response:"
                 echo "$RESPONSE" | jq '.'
+                
+                # Check for OPAL syntax errors and provide helpful guidance
+                if echo "$RESPONSE" | jq -r '.message // ""' | grep -q "expected one of"; then
+                    echo ""
+                    echo "OPAL Syntax Error detected. Common issues:"
+                    echo "1. Use double quotes for string values: filter severity == \"error\""
+                    echo "2. Use == for equality, not ="
+                    echo "3. Check for unescaped quotes in your query"
+                    echo ""
+                    echo "Try a simpler query first:"
+                    echo "  limit 10"
+                    echo "  filter severity == \"error\""
+                    echo "  filter level == \"error\""
+                fi
             fi
             """,
             args=[
