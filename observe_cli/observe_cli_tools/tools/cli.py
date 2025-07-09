@@ -75,6 +75,11 @@ class CLITools:
                 exit 1
             fi
             
+            # Debug: Show the structure of the first item
+            echo "=== Debug: First dataset structure ==="
+            echo "$RESPONSE" | jq '.[0] // .data[0] // "No data found"' | head -20
+            echo ""
+            
             # Extract datasets array
             DATASETS=$(echo "$RESPONSE" | jq -r '.data // . // []')
             
@@ -91,9 +96,9 @@ class CLITools:
             # Apply pagination using jq
             PAGINATED_DATA=$(echo "$DATASETS" | jq ".[$OFFSET:$((OFFSET + PAGE_SIZE))]")
             
-            # Show the paginated data
+            # Show the paginated data with available fields
             echo "Datasets:"
-            echo "$PAGINATED_DATA" | jq -r '.[] | "\(.id // "null") - \(.name // "unnamed") (\(.type // "unknown"))"'
+            echo "$PAGINATED_DATA" | jq -r '.[] | "\(.id // .datasetId // .name // "unknown-id") - \(.name // .displayName // "unnamed") (\(.type // .datasetType // "unknown"))"'
             
             # Show pagination info
             if [ $TOTAL_COUNT -gt $((OFFSET + PAGE_SIZE)) ]; then
