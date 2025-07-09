@@ -101,7 +101,7 @@ class CLITools:
             
             # Show the paginated data with available fields
             echo "Datasets:"
-            echo "$PAGINATED_DATA" | jq -r '.[] | "\(.id // .datasetId // .name // "unknown-id") - \(.name // .displayName // "unnamed") (\(.type // .datasetType // "unknown"))"'
+            echo "$PAGINATED_DATA" | jq -r '.[] | "\(.meta.id // "unknown-id") - \(.config.name // "unnamed") (\(.state.kind // "unknown"))"'
             
             # Show pagination info
             if [ $TOTAL_COUNT -gt $((OFFSET + PAGE_SIZE)) ]; then
