@@ -96,7 +96,7 @@ class CLITools:
         """Execute OPAL queries on datasets with smart dataset selection."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets using jq for proper JSON handling. Can search by dataset name or use dataset ID directly. For checking errors in logs, use: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. The tool uses jq to properly escape and construct JSON payloads and automatically sanitizes input to handle quote issues.",
+            description="Execute OPAL queries on Observe datasets using jq for proper JSON handling. Can search by dataset name or use dataset ID directly. For checking errors in logs, use: dataset_id='kong' opal_query='\"filter severity == \\\"error\\\"\"' interval='1h'. The tool uses jq to properly escape and construct JSON payloads and validates input format to prevent shell errors.",
             content="""
             # Check required environment variables
             if [ -z "$OBSERVE_API_KEY" ]; then
@@ -206,6 +206,20 @@ class CLITools:
             if [ -z "$opal_query" ]; then
                 opal_query="limit 10"
                 echo "No query provided, using default: $opal_query"
+            fi
+            
+            # Validate the opal_query for unescaped quotes
+            # Check if the query contains any unescaped double quotes
+            if echo "$opal_query" | grep -q '"' && ! echo "$opal_query" | grep -q '\\"'; then
+                echo "Error: Invalid query format. The query contains unescaped double quotes."
+                echo ""
+                echo "Correct format examples:"
+                echo "  \"filter severity == \\\"error\\\"\""
+                echo "  \"filter status == \\\"500\\\" | limit 20\""
+                echo "  \"limit 10\""
+                echo ""
+                echo "Note: Use \\\" for double quotes inside the query string."
+                exit 1
             fi
             
             # Sanitize the opal_query to handle JSON input with unescaped quotes
