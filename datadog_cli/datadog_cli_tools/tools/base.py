@@ -43,7 +43,7 @@ cat > /root/.dogrc << EOF
 [Connection]
 apikey = ${DD_API_KEY}
 appkey = ${DD_APP_KEY}
-api_host = https://api.${DD_SITE}
+api_host = https://api.datadoghq.com
 EOF
 
 if [ -f /root/.dogrc ]; then
