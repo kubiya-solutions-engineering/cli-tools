@@ -57,7 +57,6 @@ class CLITools:
             
             echo "=== Executing Datadog Command with Dogshell ==="
             echo "Command: python -m datadog.dog $command"
-            echo "Site: $DD_SITE"
             echo "Timestamp: $(date)"
             echo ""
             
