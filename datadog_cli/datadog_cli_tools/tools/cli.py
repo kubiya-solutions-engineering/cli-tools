@@ -89,8 +89,17 @@ EOF
 
             # Install datadog package if not already installed
             echo "Installing datadog package..."
+            sleep 1
             pip install datadog
+            sleep 2
             echo "✅ Datadog package installed successfully"
+
+            # Test list monitors
+            echo "Testing list monitors..."
+            sleep 1
+            dog monitor list
+            sleep 2
+            echo "✅ List monitors test successful"
             
             # Validate required parameters first
             if [ -z "$command" ]; then
