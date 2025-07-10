@@ -64,7 +64,7 @@ EOF
             # Test list monitors
             echo "Testing list monitors..."
             sleep 1
-            dog monitor show_all --config /root/.dogrc
+            dog monitor show_all --app-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api-host ${DD_SITE}
             sleep 2
             echo "✅ List monitors test successful"
             
