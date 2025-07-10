@@ -54,39 +54,6 @@ EOF
                 exit 1
             fi
 
-            # Validate authentication environment variables
-            if [ -z "$DD_API_KEY" ]; then
-                echo "❌ Error: DD_API_KEY environment variable is not set"
-                echo ""
-                echo "💡 Hint: Set your Datadog API key:"
-                echo "  export DD_API_KEY='your-api-key-here'"
-                echo ""
-                echo "You can find your API key in Datadog:"
-                echo "  Settings → API Keys → Create API Key"
-                exit 1
-            fi
-
-            if [ -z "$DD_APP_KEY" ]; then
-                echo "❌ Error: DD_APP_KEY environment variable is not set"
-                echo ""
-                echo "💡 Hint: Set your Datadog Application key:"
-                echo "  export DD_APP_KEY='your-app-key-here'"
-                echo ""
-                echo "You can find your Application key in Datadog:"
-                echo "  Settings → Application Keys → Create Application Key"
-                exit 1
-            fi
-
-            if [ -z "$DD_SITE" ]; then
-                echo "❌ Error: DD_SITE environment variable is not set"
-                echo ""
-                echo "💡 Hint: Set your Datadog site:"
-                echo "  export DD_SITE='datadoghq.com'  # US site"
-                echo "  export DD_SITE='datadoghq.eu'   # EU site"
-                echo "  export DD_SITE='us3.datadoghq.com'  # US3 site"
-                exit 1
-            fi
-
             # Install datadog package if not already installed
             echo "Installing datadog package..."
             sleep 1
