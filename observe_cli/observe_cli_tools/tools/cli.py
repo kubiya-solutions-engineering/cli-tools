@@ -26,195 +26,201 @@ class CLITools:
             raise
 
     def list_datasets(self) -> ObserveCLITool:
-        """List all datasets with clean output."""
+        """List all datasets with clean output for AI to discover dataset IDs."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List all datasets in the Observe instance with clean output",
+            description="List all datasets in the Observe instance. Use this to discover dataset IDs and names for building OPAL queries.",
             content="""
-            # Check required environment variables
-            if [ -z "$OBSERVE_API_KEY" ]; then
-                echo "Error: OBSERVE_API_KEY environment variable is required"
+            # Validate environment
+            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+                echo "❌ OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID environment variables are required"
                 exit 1
             fi
             
-            if [ -z "$OBSERVE_CUSTOMER_ID" ]; then
-                echo "Error: OBSERVE_CUSTOMER_ID environment variable is required"
+            # Install required packages
+            apk add --no-cache jq curl >/dev/null 2>&1 || {
+                echo "❌ Failed to install jq and curl"
                 exit 1
-            fi
+            }
             
-            # Install required packages silently if not available
-            if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
-                apk add --no-cache jq curl >/dev/null 2>&1
-            fi
+            echo "📋 Fetching datasets from Observe..."
             
-            # Ensure jq is available
-            if ! command -v jq >/dev/null 2>&1; then
-                echo "Error: jq is required but not available"
-                exit 1
-            fi
-            
-            echo "Using jq for JSON handling and query construction"
-            
-            # Build URL
-            URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
-            
-            # Make API call and get response
-            RESPONSE=$(curl -s "$URL" \
+            # Get all datasets
+            API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
+            RESPONSE=$(curl -s "$API_URL" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json")
             
-            # Check if response is valid JSON
+            # Validate response
             if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
-                echo "Error: Invalid JSON response from API"
+                echo "❌ Invalid JSON response from API"
+                echo "Raw response: $RESPONSE"
                 exit 1
             fi
             
-            # Extract datasets array
+            # Parse and display datasets
             DATASETS=$(echo "$RESPONSE" | jq -r '.data // . // []')
-            
-            # Get total count
             TOTAL_COUNT=$(echo "$DATASETS" | jq length)
             
-            # Show summary if requested
-            if [ "$show_summary" = "true" ]; then
-                echo "=== Dataset Summary ==="
-                echo "Total datasets: $TOTAL_COUNT"
-                echo "========================"
-                echo ""
-            fi
+            echo "📊 Found $TOTAL_COUNT datasets"
+            echo ""
             
-            # Show all datasets in clean format
-            echo "$DATASETS" | jq -r '.[] | "\(.meta.id) - \(.config.name) (\(.state.kind))"'
+            # Show datasets in a format useful for AI query building
+            echo "Available datasets (ID | Name | Type):"
+            echo "======================================="
+            echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | sort
+            
+            echo ""
+            echo "💡 To use in OPAL queries, use full dataset ID format:"
+            echo "   o::$OBSERVE_CUSTOMER_ID:dataset:DATASET_ID"
+            echo ""
+            echo "Example query JSON structure:"
+            echo '{
+              "query": {
+                "stages": [
+                  {
+                    "input": [{"inputName": "main", "datasetId": "o::'"$OBSERVE_CUSTOMER_ID"':dataset:DATASET_ID"}],
+                    "stageID": "main",
+                    "pipeline": "filter message ~ \"error\" | limit 10"
+                  }
+                ]
+              }
+            }'
             """,
-            args=[
-                Arg(name="show_summary", description="Show summary info (default: false)", required=False)
-            ],
+            args=[],
             image="alpine:latest"
         )
 
     def execute_opal_query(self) -> ObserveCLITool:
+        """Execute OPAL queries with AI-generated JSON query body."""
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Supports raw OPAL string or prebuilt query JSON via stdin. "
-                "Use `opal_query='filter message ~ \"error\" | limit 10'` for simple searches, "
-                "or `query_json=@-` for full JSON query piped via stdin."
+                "Execute OPAL queries on Observe datasets. The AI should construct the complete JSON query body including dataset ID resolution. "
+                "Use JQ to build the query JSON with proper dataset IDs, OPAL pipeline, and optional time parameters."
             ),
             content="""
             #!/bin/sh
             set -e
-
+            
             # Validate environment
             if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
                 echo "❌ OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID are required"
                 exit 1
             fi
-
+            
+            # Install required tools
             apk add --no-cache jq curl >/dev/null 2>&1 || {
-                echo "❌ Failed to install required tools"
+                echo "❌ Failed to install jq and curl"
                 exit 1
             }
-
-            dataset_id="$dataset_id"
-            opal_query="$opal_query"
-            query_json="$query_json"
+            
+            # Parse arguments
+            query="$query"
             interval="$interval"
-
-            if [ -z "$dataset_id" ]; then
-                echo "❌ dataset_id is required"
+            start_time="$start_time"
+            end_time="$end_time"
+            
+            if [ -z "$query" ]; then
+                echo "❌ query argument is required"
+                echo ""
+                echo "The query should be a complete JSON body with dataset IDs resolved."
+                echo "Example structure:"
+                echo '{
+                  "query": {
+                    "stages": [
+                      {
+                        "input": [{"inputName": "main", "datasetId": "o::CUSTOMER_ID:dataset:DATASET_ID"}],
+                        "stageID": "main", 
+                        "pipeline": "filter message ~ \"error\" | limit 10"
+                      }
+                    ]
+                  }
+                }'
                 exit 1
             fi
-
-            echo "🔍 Resolving dataset: $dataset_id"
-
-            if echo "$dataset_id" | grep -qE '^[0-9]+$'; then
-                FULL_DATASET_ID="o::$OBSERVE_CUSTOMER_ID:dataset:$dataset_id"
-            elif echo "$dataset_id" | grep -qE '^o::.*:dataset:.*$'; then
-                FULL_DATASET_ID="$dataset_id"
-            else
-                API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset"
-                RESPONSE=$(curl -s "$API_URL" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                    --header "Content-Type: application/json")
-
-                MATCHES=$(echo "$RESPONSE" | jq -r --arg search "$dataset_id" '
-                    (.data // .) | map(select(.config.name | ascii_downcase | contains($search | ascii_downcase)))')
-
-                COUNT=$(echo "$MATCHES" | jq length)
-                if [ "$COUNT" -eq 0 ]; then
-                    echo "❌ No datasets matched '$dataset_id'"
-                    exit 1
-                elif [ "$COUNT" -gt 1 ]; then
-                    echo "❌ Multiple matches found. Please be more specific:"
-                    echo "$MATCHES" | jq -r '.[] | "  \(.meta.id | split(":")[3]) - \(.config.name) (\(.state.kind))"'
-                    exit 1
-                else
-                    FULL_DATASET_ID=$(echo "$MATCHES" | jq -r '.[0].meta.id')
-                    echo "✓ Found: $FULL_DATASET_ID"
-                fi
-            fi
-
-            # Construct query
-            if [ -n "$query_json" ]; then
-                if [ "$query_json" = "@-" ]; then
-                    QUERY_BODY=$(cat)
-                else
-                    QUERY_BODY="$query_json"
-                fi
-
-                if ! echo "$QUERY_BODY" | jq empty 2>/dev/null; then
-                    echo "❌ Provided query_json is not valid JSON"
-                    exit 1
-                fi
-            elif [ -n "$opal_query" ]; then
-                echo "🛠 Building query JSON from OPAL: $opal_query"
-                QUERY_BODY=$(jq -n --arg datasetId "$FULL_DATASET_ID" --arg pipeline "$opal_query" '
-                {
-                    query: {
-                        stages: [
-                            {
-                                input: [{ inputName: "main", datasetId: $datasetId }],
-                                stageID: "main",
-                                pipeline: $pipeline
-                            }
-                        ]
-                    }
-                }')
-            else
-                echo "❌ Either opal_query or query_json must be provided"
+            
+            # Validate JSON
+            if ! echo "$query" | jq empty 2>/dev/null; then
+                echo "❌ Invalid JSON in query argument"
+                echo "Received: $query"
                 exit 1
             fi
-
-            echo "📦 Final query JSON:"
-            echo "$QUERY_BODY" | jq .
-
-            QUERY_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+            
+            echo "📦 Query JSON:"
+            echo "$query" | jq .
+            echo ""
+            
+            # Build API URL with time parameters
+            API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+            PARAMS=""
+            
             if [ -n "$interval" ]; then
-                QUERY_URL="$QUERY_URL?interval=$interval"
+                PARAMS="interval=$interval"
             fi
-
+            
+            if [ -n "$start_time" ]; then
+                if [ -n "$PARAMS" ]; then
+                    PARAMS="$PARAMS&startTime=$start_time"
+                else
+                    PARAMS="startTime=$start_time"
+                fi
+            fi
+            
+            if [ -n "$end_time" ]; then
+                if [ -n "$PARAMS" ]; then
+                    PARAMS="$PARAMS&endTime=$end_time"
+                else
+                    PARAMS="endTime=$end_time"
+                fi
+            fi
+            
+            if [ -n "$PARAMS" ]; then
+                API_URL="$API_URL?$PARAMS"
+            fi
+            
             echo "🚀 Executing OPAL query..."
-            RESPONSE=$(curl -s "$QUERY_URL" \
+            echo "URL: $API_URL"
+            echo ""
+            
+            # Execute query
+            RESPONSE=$(curl -s "$API_URL" \
                 --request POST \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
                 --header "Accept: application/x-ndjson" \
-                --data "$QUERY_BODY")
-
-            echo ""
+                --data "$query")
+            
+            # Process response
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
-                echo "📊 Query Result:"
+                echo "📊 Query Results:"
                 echo "$RESPONSE" | jq .
+                
+                # Check for errors and provide guidance
+                if echo "$RESPONSE" | jq -e '.error // .message' >/dev/null 2>&1; then
+                    echo ""
+                    echo "⚠️  Query completed with errors - see above for details"
+                    
+                    # Provide OPAL syntax help for common issues
+                    if echo "$RESPONSE" | jq -r '.message // ""' | grep -q "expected one of"; then
+                        echo ""
+                        echo "💡 Common OPAL syntax tips:"
+                        echo "  • Pattern matching: filter message ~ \"error\""
+                        echo "  • Exact matching: filter severity == \"error\""
+                        echo "  • Operators: ==, !=, ~, !~, <, >, contains"
+                        echo "  • Piping: filter ... | limit 10 | pick_col timestamp, message"
+                    fi
+                fi
             else
-                echo "📄 Non-JSON response:"
+                echo "📄 Raw response (non-JSON):"
                 echo "$RESPONSE"
             fi
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID, name, or full dataset URI", required=True),
-                Arg(name="opal_query", description="OPAL query string (e.g., 'filter message ~ \"error\"')", required=False),
-                Arg(name="query_json", description="Full query JSON body. Use '@-' to read from stdin", required=False),
-                Arg(name="interval", description="Optional interval (e.g., '1h', '10m') for event queries", required=False),
+                Arg(name="query", description="Complete JSON query body. Must include resolved dataset IDs in format 'o::CUSTOMER_ID:dataset:DATASET_ID'. Use JQ to construct: jq -n '{query: {stages: [{input: [{inputName: \"main\", datasetId: \"o::123:dataset:456\"}], stageID: \"main\", pipeline: \"filter message ~ \\\"error\\\" | limit 10\"}]}}'", required=True),
+                Arg(name="interval", description="Time interval relative to now (e.g., '1h', '30m', '10s')", required=False),
+                Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
+                Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False)
             ],
             image="alpine:latest"
         )
