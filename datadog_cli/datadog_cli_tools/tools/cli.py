@@ -32,12 +32,15 @@ class CLITools:
             content="""
             set -e  # Exit on any error
             cat /root/.dogrc
-            
+
             # Install datadog package if not already installed
             echo "Installing datadog package..."
             pip install datadog --quiet --no-cache-dir
             echo "✅ Datadog package installed successfully"
             echo ""
+            echo "API KEY is cat ${DD_API_KEY}"
+            echo "APP KEY is cat ${DD_APP_KEY}"
+            echo "SITE is cat ${DD_SITE}"
             
             # Validate required parameters first
             if [ -z "$command" ]; then
