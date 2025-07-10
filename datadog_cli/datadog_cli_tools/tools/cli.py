@@ -44,21 +44,32 @@ class CLITools:
             else
                 echo "❌ dog command not found, attempting to locate it..."
                 
-                # Find dog command in common locations
-                DOG_LOCATIONS=(
-                    "/usr/local/bin/dog"
-                    "$(dirname $(which python))/dog"
-                    "$(python -c 'import sys; print(sys.executable.replace(\"python\", \"dog\"))' 2>/dev/null)"
-                )
-                
+                # Check common locations for dog command
                 DOG_FOUND=""
-                for location in "${DOG_LOCATIONS[@]}"; do
-                    if [ -f "$location" ] && [ -x "$location" ]; then
-                        DOG_FOUND="$location"
-                        echo "✅ Found dog command at: $location"
-                        break
+                
+                # Check /usr/local/bin/dog
+                if [ -f "/usr/local/bin/dog" ] && [ -x "/usr/local/bin/dog" ]; then
+                    DOG_FOUND="/usr/local/bin/dog"
+                    echo "✅ Found dog command at: /usr/local/bin/dog"
+                fi
+                
+                # Check alongside python executable
+                if [ -z "$DOG_FOUND" ]; then
+                    PYTHON_DIR="$(dirname $(which python))"
+                    if [ -f "$PYTHON_DIR/dog" ] && [ -x "$PYTHON_DIR/dog" ]; then
+                        DOG_FOUND="$PYTHON_DIR/dog"
+                        echo "✅ Found dog command at: $PYTHON_DIR/dog"
                     fi
-                done
+                fi
+                
+                # Check python executable replacement
+                if [ -z "$DOG_FOUND" ]; then
+                    PYTHON_DOG_PATH="$(python -c 'import sys; print(sys.executable.replace("python", "dog"))' 2>/dev/null)"
+                    if [ -f "$PYTHON_DOG_PATH" ] && [ -x "$PYTHON_DOG_PATH" ]; then
+                        DOG_FOUND="$PYTHON_DOG_PATH"
+                        echo "✅ Found dog command at: $PYTHON_DOG_PATH"
+                    fi
+                fi
                 
                 if [ -z "$DOG_FOUND" ]; then
                     echo "❌ Error: Could not locate dog command"
