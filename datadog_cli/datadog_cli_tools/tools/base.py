@@ -34,16 +34,6 @@ classDiagram
 class DatadogCLITool(Tool):
     """Base class for all Datadog CLI tools."""
     
-    name: str
-    description: str
-    content: str = ""
-    args: List[Arg] = []
-    image: str = "datadog/cli:latest"
-    icon_url: str = DATADOG_CLI_ICON_URL
-    type: str = "docker"
-    mermaid: str = DEFAULT_MERMAID
-    dogrc_path: str = ""
-    
     def __init__(self, name, description, content, args=None, image="datadog/cli:latest"):
         # Create the .dogrc configuration file content
         dogrc_content = """[Connection]
@@ -55,12 +45,12 @@ api_host = https://api.${DD_SITE}
         # Create a temporary file for the .dogrc content
         with tempfile.NamedTemporaryFile(mode='w', suffix='.dogrc', delete=False) as f:
             f.write(dogrc_content)
-            self.dogrc_path = f.name
+            dogrc_path = f.name
         
         # Define file specifications
         file_specs = [
             FileSpec(
-                source=self.dogrc_path,
+                source=dogrc_path,
                 destination="/root/.dogrc"
             )
         ]
@@ -120,7 +110,8 @@ fi
             type="docker",
             secrets=["DD_API_KEY", "DD_APP_KEY"],
             env=["DD_SITE"],
-            with_files=file_specs
+            with_files=file_specs,
+            mermaid=DEFAULT_MERMAID
         )
 
     def get_args(self) -> List[Arg]:
