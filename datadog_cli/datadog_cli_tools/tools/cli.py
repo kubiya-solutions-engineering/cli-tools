@@ -9,7 +9,8 @@ class CLITools:
         """Initialize and register all Datadog CLI tools."""
         try:
             tools = [
-                self.run_cli_command()
+                self.run_cli_command(),
+                self.list_monitors()
             ]
             
             for tool in tools:
@@ -184,6 +185,107 @@ class CLITools:
             """,
             args=[
                 Arg(name="command", description="The command to pass to dog (e.g., 'monitor show_all', 'metric post', 'event post')", required=True)
+            ],
+            image="python:3.9-slim"
+        )
+
+    def list_monitors(self) -> DatadogCLITool:
+        """List Datadog monitors with intelligent filtering options."""
+        
+        return DatadogCLITool(
+            name="datadog_list_monitors",
+            description="List Datadog monitors with filtering options to avoid timeouts and get specific results. Use filters to narrow down large datasets efficiently.",
+            content="""
+            set -e  # Exit on any error
+
+            # Install datadog package if not already installed
+            echo "Installing datadog package..."
+            pip install datadog > /dev/null 2>&1
+            echo "✅ Datadog package installed"
+
+            # Find the dog command
+            DOG_CMD=""
+            if command -v dog &> /dev/null; then
+                DOG_CMD="dog"
+            else
+                PYTHON_DIR="$(dirname $(which python))"
+                if [ -f "$PYTHON_DIR/dog" ] && [ -x "$PYTHON_DIR/dog" ]; then
+                    DOG_CMD="$PYTHON_DIR/dog"
+                else
+                    if python -c "import datadog.dogshell" &> /dev/null; then
+                        DOG_CMD="python -m datadog.dogshell"
+                    else
+                        echo "❌ Error: Could not locate dog command"
+                        exit 1
+                    fi
+                fi
+            fi
+
+            # Build the command with filters
+            CMD="$DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 monitor show_all"
+            
+            # Add filters if provided
+            if [ -n "$group_states" ]; then
+                CMD="$CMD --group_states $group_states"
+            fi
+            
+            if [ -n "$name_filter" ]; then
+                CMD="$CMD --name '$name_filter'"
+            fi
+            
+            if [ -n "$tags" ]; then
+                CMD="$CMD --tags '$tags'"
+            fi
+            
+            if [ -n "$monitor_tags" ]; then
+                CMD="$CMD --monitor_tags '$monitor_tags'"
+            fi
+
+            echo "=== Listing Datadog Monitors ==="
+            echo "Command: $CMD"
+            echo "Timestamp: $(date)"
+            echo ""
+
+            # Execute the command
+            timeout 180 $CMD 2>&1
+            exit_code=$?
+
+            if [ $exit_code -eq 124 ]; then
+                echo ""
+                echo "❌ Command timed out after 180 seconds"
+                echo "💡 Try using more specific filters to reduce the dataset size"
+                exit 1
+            elif [ $exit_code -eq 0 ]; then
+                echo ""
+                echo "✅ Monitors listed successfully"
+            else
+                echo ""
+                echo "❌ Command failed with exit code $exit_code"
+                echo "💡 Check your credentials and command syntax"
+                exit $exit_code
+            fi
+            """,
+            args=[
+                Arg(
+                    name="group_states", 
+                    description="Filter by monitor states. Options: 'all', 'alert', 'warn', 'no_data'. Use comma-separated for multiple (e.g., 'alert,warn' to show only alerting monitors). Leave empty to show all states.",
+                    required=False
+                ),
+                Arg(
+                    name="name_filter", 
+                    description="Filter monitors by name. Provide a string to search for in monitor names (e.g., 'api' to find all monitors with 'api' in the name). Case-insensitive partial matching.",
+                    required=False
+                ),
+                Arg(
+                    name="tags", 
+                    description="Filter by scope tags. Format: 'key:value' or 'key1:value1,key2:value2'. Examples: 'env:production', 'service:api,env:staging'. These are tags on the resources being monitored.",
+                    required=False
+                ),
+                Arg(
+                    name="monitor_tags", 
+                    description="Filter by monitor tags. Format: 'key:value' or 'key1:value1,key2:value2'. Examples: 'team:backend', 'priority:high,team:frontend'. These are tags applied to the monitors themselves.",
+                    required=False
+                )
             ],
             image="python:3.9-slim"
         )
