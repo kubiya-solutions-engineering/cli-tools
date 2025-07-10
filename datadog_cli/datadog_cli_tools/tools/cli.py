@@ -37,30 +37,45 @@ class CLITools:
             pip install datadog --quiet --no-cache-dir
             echo "✅ Datadog package installed successfully"
             
-            # Verify dog command is available
-            if ! command -v dog &> /dev/null; then
-                echo "❌ Error: dog command not found after installation"
-                echo ""
-                echo "💡 Trying to locate dog command..."
-                find /usr/local -name "dog" -type f 2>/dev/null || echo "dog command not found in /usr/local"
+            # Ensure dog command is available
+            echo "Checking for dog command..."
+            if command -v dog &> /dev/null; then
+                echo "✅ dog command is available at: $(which dog)"
+            else
+                echo "❌ dog command not found, attempting to locate it..."
                 
-                # Try to find the dog script in site-packages
-                python -c "import datadog; print('Datadog package installed at:', datadog.__file__)" 2>/dev/null || echo "Failed to import datadog package"
+                # Find dog command in common locations
+                DOG_LOCATIONS=(
+                    "/usr/local/bin/dog"
+                    "$(dirname $(which python))/dog"
+                    "$(python -c 'import sys; print(sys.executable.replace(\"python\", \"dog\"))' 2>/dev/null)"
+                )
                 
-                # Check if dog is in Python scripts directory
-                DOG_PATH=$(python -c "import sys; print(sys.executable.replace('python', 'dog'))" 2>/dev/null)
-                if [ -f "$DOG_PATH" ]; then
-                    echo "Found dog at: $DOG_PATH"
-                    export PATH="$(dirname $DOG_PATH):$PATH"
-                else
+                DOG_FOUND=""
+                for location in "${DOG_LOCATIONS[@]}"; do
+                    if [ -f "$location" ] && [ -x "$location" ]; then
+                        DOG_FOUND="$location"
+                        echo "✅ Found dog command at: $location"
+                        break
+                    fi
+                done
+                
+                if [ -z "$DOG_FOUND" ]; then
                     echo "❌ Error: Could not locate dog command"
                     echo ""
-                    echo "💡 Tip: Make sure the datadog package is properly installed with CLI tools"
-                    echo "  Try: pip install datadog[cli] or pip install datadog --upgrade"
+                    echo "💡 Debugging info:"
+                    echo "  • Python location: $(which python)"
+                    echo "  • Datadog package: $(python -c 'import datadog; print(datadog.__file__)' 2>/dev/null || echo 'Not found')"
+                    echo "  • PATH: $PATH"
+                    echo ""
+                    echo "💡 Try: pip install datadog --upgrade --force-reinstall"
                     exit 1
                 fi
-            else
-                echo "✅ dog command is available"
+                
+                # Add dog directory to PATH
+                DOG_DIR="$(dirname "$DOG_FOUND")"
+                export PATH="$DOG_DIR:$PATH"
+                echo "✅ Added $DOG_DIR to PATH"
             fi
             
             # Validate required parameters
@@ -89,30 +104,10 @@ class CLITools:
             # Execute the dog command directly
             echo "Executing command..."
             
-            # Try different methods to execute the dogshell command
-            if command -v dog &> /dev/null; then
-                echo "Using dog command directly..."
-                output=$(dog $command 2>&1)
-                exit_code=$?
-            elif python -c "import datadog.dogshell" &> /dev/null; then
-                echo "Using python -m datadog.dogshell..."
-                output=$(python -m datadog.dogshell $command 2>&1)
-                exit_code=$?
-            elif python -c "from datadog.dogshell import main" &> /dev/null; then
-                echo "Using python dogshell main function..."
-                output=$(python -c "from datadog.dogshell import main; import sys; sys.argv = ['dog'] + '$command'.split(); main()" 2>&1)
-                exit_code=$?
-            else
-                echo "❌ Error: No valid method to execute dogshell found"
-                echo ""
-                echo "💡 Debugging information:"
-                echo "  • Datadog package location: $(python -c "import datadog; print(datadog.__file__)" 2>/dev/null || echo 'Not found')"
-                echo "  • Python path: $(which python)"
-                echo "  • Installed packages: $(pip list | grep -i datadog || echo 'No datadog packages found')"
-                echo ""
-                echo "💡 Try installing with: pip install datadog --upgrade"
-                exit 1
-            fi
+            # Execute the dog command (we've already verified it's available)
+            echo "Running: dog $command"
+            output=$(dog $command 2>&1)
+            exit_code=$?
             
             echo "Command completed with exit code: $exit_code"
             
