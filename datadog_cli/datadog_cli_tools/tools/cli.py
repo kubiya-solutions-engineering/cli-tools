@@ -32,41 +32,12 @@ class CLITools:
             content="""
             set -e  # Exit on any error
 
-            # Setup Datadog configuration
-            echo "Creating Datadog configuration file..."
-            sleep 1
-            cat > /root/.dogrc << EOF
-[Connection]
-apikey = ${DD_API_KEY}
-appkey = ${DD_APP_KEY}
-api_host = ${DD_SITE}
-EOF
-
-            if [ -f /root/.dogrc ]; then
-                echo "✅ Datadog configuration file created successfully"
-                echo ""
-                echo "📋 Configuration file contents:"
-                cat /root/.dogrc
-                echo ""
-                sleep 2
-            else
-                echo "❌ Error: Failed to create Datadog configuration file"
-                exit 1
-            fi
-
             # Install datadog package if not already installed
             echo "Installing datadog package..."
             sleep 1
             pip install datadog
             sleep 2
             echo "✅ Datadog package installed successfully"
-
-            # Test list monitors
-            echo "Testing list monitors..."
-            sleep 1
-            dog --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} monitor show_all
-            sleep 2
-            echo "✅ List monitors test successful"
             
             # Validate required parameters first
             if [ -z "$command" ]; then
@@ -114,7 +85,7 @@ EOF
             fi
             
             echo "=== Executing Datadog Command ==="
-            echo "Command: $DOG_CMD $command"
+            echo "Command: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} $command"
             echo "Timestamp: $(date)"
             echo ""
             
@@ -125,7 +96,7 @@ EOF
             set +e  # Don't exit on error so we can handle it
             
             # Execute with timeout and capture output
-            timeout 60 $DOG_CMD $command 2>&1
+            timeout 60 $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} $command 2>&1
             exit_code=$?
             
             # Handle the results
@@ -150,7 +121,7 @@ EOF
                 
                 # Provide specific help based on common issues
                 if [ $exit_code -eq 1 ]; then
-                    echo "  • Check command syntax: $DOG_CMD $command"
+                    echo "  • Check command syntax: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} $command"
                     echo "  • Verify authentication credentials"
                     echo "  • Use '$DOG_CMD -h' to see available commands"
                 elif [ $exit_code -eq 2 ]; then
