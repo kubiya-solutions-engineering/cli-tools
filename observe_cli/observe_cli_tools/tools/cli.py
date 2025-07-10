@@ -95,23 +95,6 @@ class CLITools:
                 echo "======================================="
                 echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":") | last) | \(.config.name) | \(.state.kind)"' | sort
             fi
-            
-            echo ""
-            echo "💡 To use in OPAL queries, use full dataset ID format:"
-            echo "   o::$OBSERVE_CUSTOMER_ID:dataset:DATASET_ID"
-            echo ""
-            echo "Example query JSON structure:"
-            echo '{
-              "query": {
-                "stages": [
-                  {
-                    "input": [{"inputName": "main", "datasetId": "o::'"$OBSERVE_CUSTOMER_ID"':dataset:DATASET_ID"}],
-                    "stageID": "main",
-                    "pipeline": "filter message ~ \"error\" | limit 10"
-                  }
-                ]
-              }
-            }'
             """,
             args=[
                 Arg(name="filter", description="Optional filter to search for datasets containing this text (case-insensitive)", required=False)
