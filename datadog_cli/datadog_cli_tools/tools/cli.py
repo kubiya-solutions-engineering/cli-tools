@@ -64,7 +64,7 @@ EOF
             # Test list monitors
             echo "Testing list monitors..."
             sleep 1
-            dog monitor show_all
+            dog monitor show_all --config /root/.dogrc
             sleep 2
             echo "✅ List monitors test successful"
             
