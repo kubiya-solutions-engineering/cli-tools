@@ -67,24 +67,24 @@ class CLITools:
             # Apply filter if provided
             if [ -n "$filter" ]; then
                 echo "🔍 Filtering datasets containing: $filter"
-                FILTERED_DATASETS=$(echo "$DATASETS" | jq -r --arg filter "$filter" '.[] | select(.config.name | ascii_downcase | contains($filter | ascii_downcase))')
+                FILTERED_DATASETS=$(echo "$DATASETS" | jq --arg filter "$filter" 'map(select(.config.name | ascii_downcase | contains($filter | ascii_downcase)))')
                 
-                if [ -z "$FILTERED_DATASETS" ]; then
+                FILTERED_COUNT=$(echo "$FILTERED_DATASETS" | jq length)
+                if [ "$FILTERED_COUNT" -eq 0 ]; then
                     echo "❌ No datasets found matching filter: $filter"
                     echo ""
                     echo "Available datasets (showing first 10):"
-                    echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | head -10
+                    echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":") | last) | \(.config.name) | \(.state.kind)"' | head -10
                     exit 1
                 fi
                 
-                FILTERED_COUNT=$(echo "$FILTERED_DATASETS" | jq -s length)
                 echo "📊 Found $FILTERED_COUNT datasets matching '$filter'"
                 echo ""
                 
                 # Show filtered datasets
                 echo "Matching datasets (ID | Name | Type):"
                 echo "====================================="
-                echo "$FILTERED_DATASETS" | jq -r '"\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | sort
+                echo "$FILTERED_DATASETS" | jq -r '.[] | "\(.meta.id | split(":") | last) | \(.config.name) | \(.state.kind)"' | sort
             else
                 TOTAL_COUNT=$(echo "$DATASETS" | jq length)
                 echo "📊 Found $TOTAL_COUNT datasets"
@@ -93,7 +93,7 @@ class CLITools:
                 # Show all datasets
                 echo "Available datasets (ID | Name | Type):"
                 echo "======================================="
-                echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | sort
+                echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":") | last) | \(.config.name) | \(.state.kind)"' | sort
             fi
             
             echo ""
