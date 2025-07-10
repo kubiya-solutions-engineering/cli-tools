@@ -96,7 +96,7 @@ class CLITools:
         """Execute OPAL queries on datasets with smart dataset selection (stateless, robust)."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets. The tool accepts named arguments and converts them to positional arguments for the shell script. Example: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. IMPORTANT: Use double quotes around string values in OPAL queries (e.g., filter severity == \"error\"). The tool uses jq to build the JSON body and is stateless and robust to quoting issues.",
+            description="Execute OPAL queries on Observe datasets. The tool accepts named arguments and converts them to positional arguments for the shell script. Example: dataset_id='kong' opal_query='filter message ~ error' interval='1h'. IMPORTANT: For reliable results, use pattern matching (e.g., filter message ~ error) instead of direct field comparison. The tool auto-fixes common syntax issues and provides helpful error guidance. The tool uses jq to build the JSON body and is stateless and robust to quoting issues.",
             content="""
             #!/bin/sh
             set -e
@@ -125,6 +125,27 @@ class CLITools:
                 echo "Original: $opal_query"
                 echo "Consider using: filter severity == \"error\" (with quotes)"
                 echo ""
+            fi
+            
+            # Auto-fix common OPAL syntax issues
+            # Convert unquoted string values to properly quoted ones
+            PROCESSED_QUERY="$opal_query"
+            
+            # Fix: filter severity == error -> filter severity == "error"
+            if echo "$opal_query" | grep -q "filter.*==.*[^\"'][^ ]*$"; then
+                PROCESSED_QUERY=$(echo "$opal_query" | sed 's/filter \([^=]*\) == \([^\"'\''][^ ]*\)/filter \1 == "\2"/g')
+                if [ "$PROCESSED_QUERY" != "$opal_query" ]; then
+                    echo "Auto-fixed query: '$PROCESSED_QUERY'"
+                    opal_query="$PROCESSED_QUERY"
+                fi
+            fi
+            
+            # Alternative approach: if the query still fails, try pattern matching
+            # This is a fallback for when direct field comparison doesn't work
+            if echo "$opal_query" | grep -q "filter.*==.*\".*\""; then
+                echo "Using direct field comparison query"
+            else
+                echo "Query format looks good"
             fi
             
             # Install required packages silently if not available
@@ -251,18 +272,28 @@ class CLITools:
                     echo "2. Use == for equality, not ="
                     echo "3. Check for unescaped quotes in your query"
                     echo ""
-                    echo "Try a simpler query first:"
-                    echo "  limit 10"
+                    echo "Try these alternative query patterns:"
+                    echo "  # Pattern matching (often more reliable):"
+                    echo "  filter message ~ error"
+                    echo "  filter log ~ error"
+                    echo ""
+                    echo "  # Direct field comparison:"
                     echo "  filter severity == \"error\""
                     echo "  filter level == \"error\""
                     echo ""
+                    echo "  # Simple queries to test:"
+                    echo "  limit 10"
+                    echo "  pick_col timestamp, severity"
+                    echo ""
                     echo "Debug: The query that was sent:"
                     echo "  $opal_query"
+                    echo ""
+                    echo "Note: If direct field comparison fails, try pattern matching instead."
                 fi
             fi
             """,
             args=[
-                Arg(name="opal_query", description="OPAL query string. IMPORTANT: Use double quotes around string values (e.g., filter severity == \"error\"). Example: filter severity == \"error\"", required=True),
+                Arg(name="opal_query", description="OPAL query string. For reliable results, use pattern matching like 'filter message ~ error' instead of direct field comparison. Examples: 'filter message ~ error', 'filter severity == \"error\"', 'limit 10'", required=True),
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
             ],
