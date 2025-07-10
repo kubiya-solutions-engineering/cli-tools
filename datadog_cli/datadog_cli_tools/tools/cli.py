@@ -97,7 +97,7 @@ EOF
             # Test list monitors
             echo "Testing list monitors..."
             sleep 1
-            dog monitor list
+            dog monitor show_all
             sleep 2
             echo "✅ List monitors test successful"
             
