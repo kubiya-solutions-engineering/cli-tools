@@ -112,13 +112,80 @@ class CLITools:
             echo "Timestamp: $(date)"
             echo ""
             
+            # Quick validation - test if dog command works at all
+            echo "Testing dog command connectivity..."
+            timeout 10 dog --help > /dev/null 2>&1
+            test_exit_code=$?
+            
+            if [ $test_exit_code -eq 124 ]; then
+                echo "❌ Dog command test timed out - this suggests authentication or connectivity issues"
+                echo ""
+                echo "💡 Please check:"
+                echo "  • DD_API_KEY is set and valid"
+                echo "  • DD_APP_KEY is set and valid" 
+                echo "  • DD_SITE is set correctly"
+                echo "  • Network connectivity to Datadog API"
+                echo ""
+                echo "Current environment:"
+                echo "  • DD_API_KEY: $(if [ -n "$DD_API_KEY" ]; then echo "Set (${#DD_API_KEY} characters)"; else echo "NOT SET"; fi)"
+                echo "  • DD_APP_KEY: $(if [ -n "$DD_APP_KEY" ]; then echo "Set (${#DD_APP_KEY} characters)"; else echo "NOT SET"; fi)"
+                echo "  • DD_SITE: ${DD_SITE:-NOT SET}"
+                exit 1
+            elif [ $test_exit_code -ne 0 ]; then
+                echo "❌ Dog command test failed with exit code $test_exit_code"
+                echo ""
+                echo "💡 This might indicate configuration issues. Proceeding anyway..."
+            else
+                echo "✅ Dog command test successful"
+            fi
+            
+            # Validate command format
+            if echo "$command" | grep -q "show_all"; then
+                echo "⚠️  Warning: 'show_all' is not a standard dog command."
+                echo "💡 Did you mean 'list' instead? Common commands:"
+                echo "  • monitor list (instead of monitor show_all)"
+                echo "  • dashboard list"
+                echo "  • host list"
+                echo ""
+                echo "Proceeding with your command anyway..."
+            fi
+            
             # Execute the dog command directly
             echo "Executing command..."
             
             # Execute the dog command (we've already verified it's available)
             echo "Running: dog $command"
-            output=$(dog $command 2>&1)
+            
+            # Add timeout to prevent hanging and capture both stdout and stderr
+            timeout 30 dog $command > /tmp/dog_output.txt 2>&1 &
+            DOG_PID=$!
+            
+            # Wait for the command to complete or timeout
+            wait $DOG_PID
             exit_code=$?
+            
+            # Read the output
+            if [ -f /tmp/dog_output.txt ]; then
+                output=$(cat /tmp/dog_output.txt)
+                rm -f /tmp/dog_output.txt
+            else
+                output="No output captured"
+            fi
+            
+            # Handle timeout case
+            if [ $exit_code -eq 124 ]; then
+                echo "❌ Command timed out after 30 seconds"
+                echo ""
+                echo "💡 This might indicate:"
+                echo "  • Authentication issues (check DD_API_KEY, DD_APP_KEY)"
+                echo "  • Network connectivity problems"
+                echo "  • Invalid command syntax"
+                echo "  • Datadog API is slow to respond"
+                echo ""
+                echo "Command output before timeout:"
+                echo "$output"
+                exit_code=1
+            fi
             
             echo "Command completed with exit code: $exit_code"
             
