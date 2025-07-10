@@ -37,6 +37,32 @@ class CLITools:
             pip install datadog --quiet --no-cache-dir
             echo "✅ Datadog package installed successfully"
             
+            # Verify dog command is available
+            if ! command -v dog &> /dev/null; then
+                echo "❌ Error: dog command not found after installation"
+                echo ""
+                echo "💡 Trying to locate dog command..."
+                find /usr/local -name "dog" -type f 2>/dev/null || echo "dog command not found in /usr/local"
+                
+                # Try to find the dog script in site-packages
+                python -c "import datadog; print('Datadog package installed at:', datadog.__file__)" 2>/dev/null || echo "Failed to import datadog package"
+                
+                # Check if dog is in Python scripts directory
+                DOG_PATH=$(python -c "import sys; print(sys.executable.replace('python', 'dog'))" 2>/dev/null)
+                if [ -f "$DOG_PATH" ]; then
+                    echo "Found dog at: $DOG_PATH"
+                    export PATH="$(dirname $DOG_PATH):$PATH"
+                else
+                    echo "❌ Error: Could not locate dog command"
+                    echo ""
+                    echo "💡 Tip: Make sure the datadog package is properly installed with CLI tools"
+                    echo "  Try: pip install datadog[cli] or pip install datadog --upgrade"
+                    exit 1
+                fi
+            else
+                echo "✅ dog command is available"
+            fi
+            
             # Validate required parameters
             if [ -z "$command" ]; then
                 echo "❌ Error: Command is required"
@@ -62,8 +88,31 @@ class CLITools:
             
             # Execute the dog command directly
             echo "Executing command..."
-            output=$(dog $command 2>&1)
-            exit_code=$?
+            
+            # Try different methods to execute the dogshell command
+            if command -v dog &> /dev/null; then
+                echo "Using dog command directly..."
+                output=$(dog $command 2>&1)
+                exit_code=$?
+            elif python -c "import datadog.dogshell" &> /dev/null; then
+                echo "Using python -m datadog.dogshell..."
+                output=$(python -m datadog.dogshell $command 2>&1)
+                exit_code=$?
+            elif python -c "from datadog.dogshell import main" &> /dev/null; then
+                echo "Using python dogshell main function..."
+                output=$(python -c "from datadog.dogshell import main; import sys; sys.argv = ['dog'] + '$command'.split(); main()" 2>&1)
+                exit_code=$?
+            else
+                echo "❌ Error: No valid method to execute dogshell found"
+                echo ""
+                echo "💡 Debugging information:"
+                echo "  • Datadog package location: $(python -c "import datadog; print(datadog.__file__)" 2>/dev/null || echo 'Not found')"
+                echo "  • Python path: $(which python)"
+                echo "  • Installed packages: $(pip list | grep -i datadog || echo 'No datadog packages found')"
+                echo ""
+                echo "💡 Try installing with: pip install datadog --upgrade"
+                exit 1
+            fi
             
             echo "Command completed with exit code: $exit_code"
             
@@ -78,8 +127,25 @@ class CLITools:
                 echo "$output"
                 echo ""
                 
+                # Get available commands from dog -h for better error guidance
+                echo "📋 Getting available commands to help troubleshoot..."
+                help_output=""
+                if command -v dog &> /dev/null; then
+                    help_output=$(dog -h 2>&1 || echo "Failed to get help")
+                elif python -c "import datadog.dogshell" &> /dev/null; then
+                    help_output=$(python -m datadog.dogshell -h 2>&1 || echo "Failed to get help")
+                else
+                    help_output="Help not available - dogshell not found"
+                fi
+                
+                echo ""
+                echo "=== Available Datadog Commands ==="
+                echo "$help_output"
+                echo ""
+                echo "=== Troubleshooting Guide ==="
+                
                 # Provide helpful hints based on common error patterns
-                if echo "$output" | grep -q "command not found\|unknown command\|No module named\|usage:"; then
+                if echo "$output" | grep -q "command not found\|unknown command\|No module named\|usage:\|invalid choice"; then
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
                     echo "Common dog commands:"
@@ -92,7 +158,7 @@ class CLITools:
                     echo "  • dog search"
                     echo "  • dog comment post"
                     echo ""
-                    echo "💡 Tip: Use 'dog -h' to see all available commands"
+                    echo "💡 Tip: Check the available commands above and try again"
                 elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
                     echo "💡 Hint: Authentication failed. Please check:"
                     echo "  • DD_API_KEY is correct and has proper permissions"
@@ -116,6 +182,11 @@ class CLITools:
                     echo "  • Check command spelling and format"
                     echo "  • Use 'dog $command -h' for usage information"
                     echo "  • Verify required parameters are provided"
+                elif echo "$output" | grep -q "required\|missing"; then
+                    echo "💡 Hint: Missing required parameters."
+                    echo "  • Check the command syntax above"
+                    echo "  • Use 'dog $command -h' for specific parameter requirements"
+                    echo "  • Ensure all required arguments are provided"
                 else
                     echo "💡 General troubleshooting tips:"
                     echo "  • Use 'dog -h' to see available commands"
@@ -123,6 +194,12 @@ class CLITools:
                     echo "  • Check Dogshell documentation: https://docs.datadoghq.com/developers/guide/dogshell/"
                     echo "  • Verify your Datadog account permissions"
                 fi
+                
+                echo ""
+                echo "💡 Quick Actions:"
+                echo "  • Run 'dog -h' to see all available commands"
+                echo "  • Run 'dog $command -h' to see specific command usage"
+                echo "  • Check your environment variables (DD_API_KEY, DD_APP_KEY, DD_SITE)"
                 
                 exit $exit_code
             fi
