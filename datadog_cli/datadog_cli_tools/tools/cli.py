@@ -89,7 +89,7 @@ EOF
 
             # Install datadog package if not already installed
             echo "Installing datadog package..."
-            pip install datadog --quiet --no-cache-dir
+            pip install datadog
             echo "✅ Datadog package installed successfully"
             
             # Validate required parameters first
