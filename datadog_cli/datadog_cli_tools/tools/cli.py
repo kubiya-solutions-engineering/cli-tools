@@ -55,6 +55,23 @@ class CLITools:
                 echo "  • tag list              - List tags"
                 echo "  • search                - Search metrics/events"
                 echo "  • comment post          - Post a comment"
+                echo ""
+                echo "💡 For large datasets, use filters to improve performance:"
+                echo ""
+                echo "Monitor filtering examples:"
+                echo "  • monitor show_all --group_states alert,warn"
+                echo "    └── Only show monitors currently alerting or warning"
+                echo "  • monitor show_all --name 'api'"
+                echo "    └── Only show monitors with 'api' in the name"
+                echo "  • monitor show_all --tags 'env:production'"
+                echo "    └── Only show monitors for production environment"
+                echo "  • monitor show_all --monitor_tags 'team:backend'"
+                echo "    └── Only show monitors tagged with team:backend"
+                echo "  • monitor show_all --group_states alert --tags 'service:api'"
+                echo "    └── Combine filters for more specific results"
+                echo ""
+                echo "Available group_states: all, alert, warn, no_data"
+                echo "Tags format: 'key:value' or 'key:value,key2:value2'"
                 exit 1
             fi
             
@@ -85,7 +102,7 @@ class CLITools:
             fi
             
             echo "=== Executing Datadog Command ==="
-            echo "Command: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} $command"
+            echo "Command: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 $command"
             echo "Timestamp: $(date)"
             echo ""
             
@@ -96,19 +113,29 @@ class CLITools:
             set +e  # Don't exit on error so we can handle it
             
             # Execute with timeout and capture output
-            timeout 60 $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} $command 2>&1
+            timeout 180 $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 $command 2>&1
             exit_code=$?
             
             # Handle the results
             if [ $exit_code -eq 124 ]; then
                 echo ""
-                echo "❌ Command timed out after 60 seconds"
+                echo "❌ Command timed out after 180 seconds"
                 echo ""
                 echo "💡 This might indicate:"
                 echo "  • Authentication issues (check DD_API_KEY, DD_APP_KEY)"
                 echo "  • Network connectivity problems"
                 echo "  • Invalid command syntax"
                 echo "  • Datadog API is slow to respond"
+                echo "  • Large dataset - consider using filters or pagination"
+                echo ""
+                if [[ "$command" == *"monitor show_all"* ]]; then
+                    echo "💡 For monitor show_all, try filtering to reduce dataset size:"
+                    echo "  • --group_states alert,warn (only alerting monitors)"
+                    echo "  • --name 'search_term' (filter by monitor name)"
+                    echo "  • --tags 'env:production' (filter by scope tags)"
+                    echo "  • --monitor_tags 'team:backend' (filter by monitor tags)"
+                    echo ""
+                fi
                 exit 1
             elif [ $exit_code -eq 0 ]; then
                 echo ""
@@ -121,7 +148,7 @@ class CLITools:
                 
                 # Provide specific help based on common issues
                 if [ $exit_code -eq 1 ]; then
-                    echo "  • Check command syntax: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} $command"
+                    echo "  • Check command syntax: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 $command"
                     echo "  • Verify authentication credentials"
                     echo "  • Use '$DOG_CMD -h' to see available commands"
                 elif [ $exit_code -eq 2 ]; then
@@ -142,6 +169,15 @@ class CLITools:
                 echo "  • event post"
                 echo "  • host list"
                 echo "  • tag list"
+                
+                if [[ "$command" == *"monitor show_all"* ]]; then
+                    echo ""
+                    echo "💡 For monitor show_all, consider using filters:"
+                    echo "  • --group_states alert,warn"
+                    echo "  • --name 'search_term'"
+                    echo "  • --tags 'key:value'"
+                    echo "  • --monitor_tags 'key:value'"
+                fi
                 
                 exit $exit_code
             fi
