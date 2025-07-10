@@ -56,13 +56,13 @@ class CLITools:
             fi
             
             echo "=== Executing Datadog Command with Dogshell ==="
-            echo "Command: python -m datadog.dog $command"
+            echo "Command: dog $command"
             echo "Timestamp: $(date)"
             echo ""
             
-            # Execute the dog command using Python module
+            # Execute the dog command directly
             echo "Executing command..."
-            output=$(python -m datadog.dog $command 2>&1)
+            output=$(dog $command 2>&1)
             exit_code=$?
             
             echo "Command completed with exit code: $exit_code"
@@ -83,16 +83,16 @@ class CLITools:
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
                     echo "Common dog commands:"
-                    echo "  • python -m datadog.dog monitor list"
-                    echo "  • python -m datadog.dog dashboard list"
-                    echo "  • python -m datadog.dog metric post"
-                    echo "  • python -m datadog.dog event post"
-                    echo "  • python -m datadog.dog host list"
-                    echo "  • python -m datadog.dog tag list"
-                    echo "  • python -m datadog.dog search"
-                    echo "  • python -m datadog.dog comment post"
+                    echo "  • dog monitor list"
+                    echo "  • dog dashboard list"
+                    echo "  • dog metric post"
+                    echo "  • dog event post"
+                    echo "  • dog host list"
+                    echo "  • dog tag list"
+                    echo "  • dog search"
+                    echo "  • dog comment post"
                     echo ""
-                    echo "💡 Tip: Use 'python -m datadog.dog -h' to see all available commands"
+                    echo "💡 Tip: Use 'dog -h' to see all available commands"
                 elif echo "$output" | grep -q "authentication\|unauthorized\|403\|401"; then
                     echo "💡 Hint: Authentication failed. Please check:"
                     echo "  • DD_API_KEY is correct and has proper permissions"
@@ -114,12 +114,12 @@ class CLITools:
                 elif echo "$output" | grep -q "invalid\|syntax\|malformed"; then
                     echo "💡 Hint: Invalid command syntax."
                     echo "  • Check command spelling and format"
-                    echo "  • Use 'python -m datadog.dog $command -h' for usage information"
+                    echo "  • Use 'dog $command -h' for usage information"
                     echo "  • Verify required parameters are provided"
                 else
                     echo "💡 General troubleshooting tips:"
-                    echo "  • Use 'python -m datadog.dog -h' to see available commands"
-                    echo "  • Use 'python -m datadog.dog $command -h' for specific command help"
+                    echo "  • Use 'dog -h' to see available commands"
+                    echo "  • Use 'dog $command -h' for specific command help"
                     echo "  • Check Dogshell documentation: https://docs.datadoghq.com/developers/guide/dogshell/"
                     echo "  • Verify your Datadog account permissions"
                 fi
