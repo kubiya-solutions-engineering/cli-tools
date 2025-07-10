@@ -154,10 +154,7 @@ class CLITools:
                 fi
                 
                 # Find matching datasets
-                MATCHES=$(echo "$DATASET_RESPONSE" | jq -r --arg search "$dataset_id" '
-                    (.data // .) | map(select(.config.name | ascii_downcase | contains($search | ascii_downcase))) | 
-                    map({id: .meta.id, name: .config.name, type: .state.kind})
-                ')
+                MATCHES=$(echo "$DATASET_RESPONSE" | jq -r --arg search "$dataset_id" '(.data // .) | map(select(.config.name | ascii_downcase | contains($search | ascii_downcase))) | map({id: .meta.id, name: .config.name, type: .state.kind})')
                 
                 MATCH_COUNT=$(echo "$MATCHES" | jq length)
                 
@@ -202,18 +199,7 @@ class CLITools:
                 # Build JSON from OPAL query string
                 echo "📝 Building query from OPAL string: $opal_query"
                 
-                QUERY_BODY=$(jq -n \
-                    --arg datasetId "$FULL_DATASET_ID" \
-                    --arg pipeline "$opal_query" \
-                    '{
-                        query: {
-                            stages: [{
-                                input: [{inputName: "main", datasetId: $datasetId}],
-                                stageID: "main",
-                                pipeline: $pipeline
-                            }]
-                        }
-                    }')
+                QUERY_BODY=$(jq -n --arg datasetId "$FULL_DATASET_ID" --arg pipeline "$opal_query" '{query: {stages: [{input: [{inputName: "main", datasetId: $datasetId}], stageID: "main", pipeline: $pipeline}]}}')
             else
                 echo "❌ Error: Either opal_query or query_json is required"
                 echo ""
