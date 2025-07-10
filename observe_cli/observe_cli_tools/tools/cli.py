@@ -96,7 +96,7 @@ class CLITools:
         """Execute OPAL queries on datasets with smart dataset selection (stateless, robust)."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute OPAL queries on Observe datasets. The tool accepts named arguments and converts them to positional arguments for the shell script. Example: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. The tool uses jq to build the JSON body and is stateless and robust to quoting issues.",
+            description="Execute OPAL queries on Observe datasets. The tool accepts named arguments and converts them to positional arguments for the shell script. Example: dataset_id='kong' opal_query='filter severity == \"error\"' interval='1h'. IMPORTANT: Use double quotes around string values in OPAL queries (e.g., filter severity == \"error\"). The tool uses jq to build the JSON body and is stateless and robust to quoting issues.",
             content="""
             #!/bin/sh
             set -e
@@ -119,14 +119,12 @@ class CLITools:
             echo "Interval: $interval"
             
             # Preprocess the OPAL query to fix common syntax issues
-            # Fix: Add quotes around unquoted string values in filter conditions
-            # Example: filter severity == error -> filter severity == "error"
-            PROCESSED_QUERY=$(echo "$opal_query" | sed -E 's/filter ([^=]+) == ([^"'\''][^ ]*[^"'\'' ])/filter \1 == "\2"/g')
-            
-            # Only use processed query if it's different from original
-            if [ "$PROCESSED_QUERY" != "$opal_query" ]; then
-                echo "Auto-fixed query: '$PROCESSED_QUERY'"
-                opal_query="$PROCESSED_QUERY"
+            # Check for common OPAL syntax issues and provide guidance
+            if echo "$opal_query" | grep -q "filter.*==.*[^\"']"; then
+                echo "Warning: Query may have unquoted string values"
+                echo "Original: $opal_query"
+                echo "Consider using: filter severity == \"error\" (with quotes)"
+                echo ""
             fi
             
             # Install required packages silently if not available
@@ -264,7 +262,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="opal_query", description="OPAL query string. Example: filter severity == \"error\"", required=True),
+                Arg(name="opal_query", description="OPAL query string. IMPORTANT: Use double quotes around string values (e.g., filter severity == \"error\"). Example: filter severity == \"error\"", required=True),
                 Arg(name="dataset_id", description="Dataset ID (numeric like 41231950), full ID, or dataset name (e.g., 'kong', 'monitor', 'nginx')", required=True),
                 Arg(name="interval", description="Time interval (e.g., 1h, 10m, 30s). Required for Event datasets if no start_time/end_time provided", required=False)
             ],
