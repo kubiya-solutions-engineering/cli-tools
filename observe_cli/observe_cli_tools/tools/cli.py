@@ -118,6 +118,19 @@ class CLITools:
             echo "Dataset ID: $dataset_id"
             echo "Interval: $interval"
             
+            # Strip outer quotes if present (some callers wrap the query string in extra quotes)
+            case "$opal_query" in
+                \"*\")
+                    opal_query=${opal_query#\"}
+                    opal_query=${opal_query%\"}
+                    ;;
+                \'*\')
+                    opal_query=${opal_query#\'}
+                    opal_query=${opal_query%\'}
+                    ;;
+            esac
+            echo "Sanitized query: $opal_query"
+            
             # Preprocess the OPAL query to fix common syntax issues
             # Check for common OPAL syntax issues and provide guidance
             if echo "$opal_query" | grep -q "filter.*==.*[^\"']"; then
