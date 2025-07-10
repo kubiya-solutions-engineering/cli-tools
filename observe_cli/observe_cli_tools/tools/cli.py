@@ -145,9 +145,20 @@ class CLITools:
             PROCESSED_QUERY="$opal_query"
             
             # Fix: filter severity == error -> filter severity == "error"
-            if echo "$opal_query" | grep -q "filter.*==.*[^\"'][^ ]*$"; then
-                PROCESSED_QUERY=$(echo "$opal_query" | sed 's/filter \([^=]*\) == \([^\"'\''][^ ]*\)/filter \1 == "\2"/g')
-                if [ "$PROCESSED_QUERY" != "$opal_query" ]; then
+            if echo "$opal_query" | grep -q "filter[[:space:]].*==[[:space:]][^\"'[:space:]]*$"; then
+                # Use a robust awk replacement to wrap the RHS of '==' in quotes if it lacks them
+                PROCESSED_QUERY=$(echo "$opal_query" | awk '
+                    BEGIN { OFS="=" }
+                    /^filter/ {
+                        for (i=1;i<=NF;i++) {
+                            if ($i == "==" && (i+1)<=NF && $ (i+1 ) !~ /^\".*\"$/) {
+                                $(i+1)="\""$(i+1)"\""
+                            }
+                        }
+                        print $0
+                    }
+                    ')
+                if [ -n "$PROCESSED_QUERY" ] && [ "$PROCESSED_QUERY" != "$opal_query" ]; then
                     echo "Auto-fixed query: '$PROCESSED_QUERY'"
                     opal_query="$PROCESSED_QUERY"
                 fi
