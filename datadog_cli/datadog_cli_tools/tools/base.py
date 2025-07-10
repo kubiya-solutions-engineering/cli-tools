@@ -51,6 +51,8 @@ if [ -f /root/.dogrc ]; then
     echo ""
     echo "📋 Configuration file contents:"
     cat /root/.dogrc
+    cat /root/.dogrc
+    cat /root/.dogrc
     echo ""
 else
     echo "❌ Error: Failed to create Datadog configuration file"
