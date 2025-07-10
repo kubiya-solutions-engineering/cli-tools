@@ -112,9 +112,22 @@ class CLITools:
                 exit 1
             fi
             
+            # Debug: Show the raw query as received
+            echo "Raw query received: '$opal_query'"
             echo "Query: $opal_query"
             echo "Dataset ID: $dataset_id"
             echo "Interval: $interval"
+            
+            # Preprocess the OPAL query to fix common syntax issues
+            # Fix: Add quotes around unquoted string values in filter conditions
+            # Example: filter severity == error -> filter severity == "error"
+            PROCESSED_QUERY=$(echo "$opal_query" | sed -E 's/filter ([^=]+) == ([^"'\''][^ ]*[^"'\'' ])/filter \1 == "\2"/g')
+            
+            # Only use processed query if it's different from original
+            if [ "$PROCESSED_QUERY" != "$opal_query" ]; then
+                echo "Auto-fixed query: '$PROCESSED_QUERY'"
+                opal_query="$PROCESSED_QUERY"
+            fi
             
             # Install required packages silently if not available
             if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
@@ -185,7 +198,8 @@ class CLITools:
                 echo "Dataset ID: $FULL_DATASET_ID"
             fi
             
-            # Build JSON body with jq (without interval in body)
+            # Build JSON body with jq - using proper escaping for the OPAL query
+            # The key fix: use --arg to properly escape the opal_query variable
             json_body=$(jq -n \
                 --arg datasetId "$FULL_DATASET_ID" \
                 --arg pipeline "$opal_query" \
@@ -243,6 +257,9 @@ class CLITools:
                     echo "  limit 10"
                     echo "  filter severity == \"error\""
                     echo "  filter level == \"error\""
+                    echo ""
+                    echo "Debug: The query that was sent:"
+                    echo "  $opal_query"
                 fi
             fi
             """,
