@@ -93,10 +93,11 @@ class CLITools:
             if [ -z "$command" ]; then
                 echo "❌ Error: Command is required"
                 echo ""
-                echo "Usage: Provide a Dogshell command (e.g., 'monitor list', 'dashboard list')"
+                echo "Usage: Provide a Dogshell command (e.g., 'monitor show_all', 'dashboard list')"
                 echo ""
                 echo "Common commands:"
-                echo "  • monitor list          - List all monitors"
+                echo "  • monitor show_all      - Show all monitors"
+                echo "  • monitor show <id>     - Show specific monitor"
                 echo "  • dashboard list        - List all dashboards"
                 echo "  • metric post           - Post a metric"
                 echo "  • event post            - Post an event"
@@ -140,12 +141,18 @@ class CLITools:
             fi
             
             # Validate command format
-            if echo "$command" | grep -q "show_all"; then
-                echo "⚠️  Warning: 'show_all' is not a standard dog command."
-                echo "💡 Did you mean 'list' instead? Common commands:"
-                echo "  • monitor list (instead of monitor show_all)"
-                echo "  • dashboard list"
-                echo "  • host list"
+            if echo "$command" | grep -q "^monitor.*show_all"; then
+                echo "✅ Using valid monitor command: show_all"
+            elif echo "$command" | grep -q "^monitor " && ! echo "$command" | grep -qE "(post|fpost|update|show|show_all|delete|mute_all|unmute_all|mute|unmute|can_delete|validate)"; then
+                echo "⚠️  Warning: Unknown monitor subcommand."
+                echo "💡 Valid monitor commands:"
+                echo "  • monitor show_all     - Show all monitors"
+                echo "  • monitor show <id>    - Show specific monitor"
+                echo "  • monitor post         - Create a monitor"
+                echo "  • monitor update <id>  - Update a monitor"
+                echo "  • monitor delete <id>  - Delete a monitor"
+                echo "  • monitor mute <id>    - Mute a monitor"
+                echo "  • monitor unmute <id>  - Unmute a monitor"
                 echo ""
                 echo "Proceeding with your command anyway..."
             fi
@@ -222,7 +229,8 @@ class CLITools:
                     echo "💡 Hint: The command '$command' is not recognized."
                     echo ""
                     echo "Common dog commands:"
-                    echo "  • dog monitor list"
+                    echo "  • dog monitor show_all"
+                    echo "  • dog monitor show <id>"
                     echo "  • dog dashboard list"
                     echo "  • dog metric post"
                     echo "  • dog event post"
