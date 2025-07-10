@@ -29,7 +29,7 @@ class CLITools:
         """List all datasets with clean output for AI to discover dataset IDs."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List all datasets in the Observe instance. Use this to discover dataset IDs and names for building OPAL queries.",
+            description="List all datasets in the Observe instance. Use this to discover dataset IDs and names for building OPAL queries. Optionally filter by dataset name.",
             content="""
             # Validate environment
             if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
@@ -42,6 +42,9 @@ class CLITools:
                 echo "❌ Failed to install jq and curl"
                 exit 1
             }
+            
+            # Parse arguments
+            filter="$filter"
             
             echo "📋 Fetching datasets from Observe..."
             
@@ -60,15 +63,38 @@ class CLITools:
             
             # Parse and display datasets
             DATASETS=$(echo "$RESPONSE" | jq -r '.data // . // []')
-            TOTAL_COUNT=$(echo "$DATASETS" | jq length)
             
-            echo "📊 Found $TOTAL_COUNT datasets"
-            echo ""
-            
-            # Show datasets in a format useful for AI query building
-            echo "Available datasets (ID | Name | Type):"
-            echo "======================================="
-            echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | sort
+            # Apply filter if provided
+            if [ -n "$filter" ]; then
+                echo "🔍 Filtering datasets containing: $filter"
+                FILTERED_DATASETS=$(echo "$DATASETS" | jq -r --arg filter "$filter" '.[] | select(.config.name | ascii_downcase | contains($filter | ascii_downcase))')
+                
+                if [ -z "$FILTERED_DATASETS" ]; then
+                    echo "❌ No datasets found matching filter: $filter"
+                    echo ""
+                    echo "Available datasets (showing first 10):"
+                    echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | head -10
+                    exit 1
+                fi
+                
+                FILTERED_COUNT=$(echo "$FILTERED_DATASETS" | jq -s length)
+                echo "📊 Found $FILTERED_COUNT datasets matching '$filter'"
+                echo ""
+                
+                # Show filtered datasets
+                echo "Matching datasets (ID | Name | Type):"
+                echo "====================================="
+                echo "$FILTERED_DATASETS" | jq -r '"\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | sort
+            else
+                TOTAL_COUNT=$(echo "$DATASETS" | jq length)
+                echo "📊 Found $TOTAL_COUNT datasets"
+                echo ""
+                
+                # Show all datasets
+                echo "Available datasets (ID | Name | Type):"
+                echo "======================================="
+                echo "$DATASETS" | jq -r '.[] | "\(.meta.id | split(":")[3]) | \(.config.name) | \(.state.kind)"' | sort
+            fi
             
             echo ""
             echo "💡 To use in OPAL queries, use full dataset ID format:"
@@ -87,7 +113,9 @@ class CLITools:
               }
             }'
             """,
-            args=[],
+            args=[
+                Arg(name="filter", description="Optional filter to search for datasets containing this text (case-insensitive)", required=False)
+            ],
             image="alpine:latest"
         )
 
