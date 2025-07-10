@@ -39,7 +39,7 @@ class DatadogCLITool(Tool):
         setup_config = """
 # Setup Datadog configuration
 echo "Creating Datadog configuration file..."
-cat > /root/.dogrc << 'EOF'
+cat > /root/.dogrc << EOF
 [Connection]
 apikey = ${DD_API_KEY}
 appkey = ${DD_APP_KEY}
