@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_sdk.tools import Tool, Arg
 import tempfile
 import os
 
@@ -35,33 +35,21 @@ class DatadogCLITool(Tool):
     """Base class for all Datadog CLI tools."""
     
     def __init__(self, name, description, content, args=None, image="datadog/cli:latest"):
-        # Create the .dogrc configuration file content
-        dogrc_content = """[Connection]
-apikey = ${DD_API_KEY}
-appkey = ${DD_APP_KEY}
-api_host = https://api.${DD_SITE}
-"""
-        
-        # Create a temporary file for the .dogrc content
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.dogrc', delete=False) as f:
-            f.write(dogrc_content)
-            dogrc_path = f.name
-        
-        # Define file specifications
-        file_specs = [
-            FileSpec(
-                source=dogrc_path,
-                destination="/root/.dogrc"
-            )
-        ]
-        
         # Add configuration setup to content
         setup_config = """
 # Setup Datadog configuration
+echo "Creating Datadog configuration file..."
+cat > /root/.dogrc << 'EOF'
+[Connection]
+apikey = ${DD_API_KEY}
+appkey = ${DD_APP_KEY}
+api_host = https://api.${DD_SITE}
+EOF
+
 if [ -f /root/.dogrc ]; then
-    echo "✅ Datadog configuration file found"
+    echo "✅ Datadog configuration file created successfully"
 else
-    echo "❌ Error: Datadog configuration file not found"
+    echo "❌ Error: Failed to create Datadog configuration file"
     exit 1
 fi
 
@@ -110,7 +98,6 @@ fi
             type="docker",
             secrets=["DD_API_KEY", "DD_APP_KEY"],
             env=["DD_SITE"],
-            with_files=file_specs,
             mermaid=DEFAULT_MERMAID
         )
 
