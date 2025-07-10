@@ -34,6 +34,7 @@ class CLITools:
 
             # Setup Datadog configuration
             echo "Creating Datadog configuration file..."
+            sleep 1
             cat > /root/.dogrc << EOF
 [Connection]
 apikey = ${DD_API_KEY}
@@ -47,6 +48,7 @@ EOF
                 echo "📋 Configuration file contents:"
                 cat /root/.dogrc
                 echo ""
+                sleep 2
             else
                 echo "❌ Error: Failed to create Datadog configuration file"
                 exit 1
