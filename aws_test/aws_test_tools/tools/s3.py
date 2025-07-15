@@ -131,6 +131,13 @@ s3_download_file = AWSCliTool(
     ],
 )
 
+aws_get_credentials = AWSCliTool(
+    name="aws_get_credentials",
+    description="Get current AWS access key ID and secret access key",
+    content="echo \"AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID\" && echo \"AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY\"",
+    args=[],
+)
+
 tool_registry.register("aws", s3_list_buckets)
 tool_registry.register("aws", s3_create_bucket)
 tool_registry.register("aws", s3_delete_bucket)
@@ -139,3 +146,4 @@ tool_registry.register("aws", s3_bulk_delete)
 tool_registry.register("aws", s3_bucket_size_analyzer)
 tool_registry.register("aws", s3_upload_file)
 tool_registry.register("aws", s3_download_file)
+tool_registry.register("aws", aws_get_credentials)
