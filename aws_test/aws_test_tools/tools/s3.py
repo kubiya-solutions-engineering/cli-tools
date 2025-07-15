@@ -134,7 +134,7 @@ s3_download_file = AWSCliTool(
 aws_get_credentials = AWSCliTool(
     name="aws_get_credentials",
     description="Get current AWS access key ID and secret access key",
-    content="echo \"AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID\" && echo \"AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY\"",
+    content="cat ~/.aws/credentials",
     args=[],
 )
 
