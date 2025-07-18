@@ -23,8 +23,8 @@ class CLITools:
             description="Execute GitHub CLI commands. Pass any 'gh' command as the 'command' argument. The tool will handle authentication and execute the command, returning the output. Examples: 'repo list', 'issue create --title \"Bug\" --body \"Description\"', 'pr list --state open', etc.",
             content="""
             # Validate environment
-            if [ -z "$GITHUB_TOKEN" ]; then
-                echo "❌ GITHUB_TOKEN environment variable is required"
+            if [ -z "$GH_TOKEN" ]; then
+                echo "❌ GH_TOKEN environment variable is required"
                 exit 1
             fi
             
@@ -45,7 +45,7 @@ class CLITools:
             }
             
             # Set up GitHub CLI authentication
-            export GH_TOKEN="$GITHUB_TOKEN"
+            export GH_TOKEN="$GH_TOKEN"
             
             # Parse the command
             cmd="$command"
