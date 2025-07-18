@@ -52,8 +52,8 @@ class GitHubCLITool(Tool):
             image=image,
             icon_url=GITHUB_CLI_ICON_URL,
             type="docker",
-            secrets=["GITHUB_TOKEN"],
-            env=["GITHUB_REPOSITORY", "GITHUB_ORGANIZATION"]
+            secrets=["GH_TOKEN"],
+            env=[]
         )
 
     def get_args(self) -> List[Arg]:
