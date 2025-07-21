@@ -13,55 +13,9 @@ class CLITools:
             azure_tool = self.azure_cli()
             tool_registry.register("azure_cli", azure_tool)
             print(f"✅ Registered: {azure_tool.name}")
-            
-            # Register the subscription listing tool
-            subscriptions_tool = self.azure_subscriptions_list()
-            tool_registry.register("azure_subscriptions_list", subscriptions_tool)
-            print(f"✅ Registered: {subscriptions_tool.name}")
         except Exception as e:
             print(f"❌ Failed to register Azure CLI tools: {str(e)}", file=sys.stderr)
             raise
-
-    def azure_subscriptions_list(self) -> AzureCLITool:
-        """List all available Azure subscriptions for the authenticated user."""
-        return AzureCLITool(
-            name="azure_subscriptions_list",
-            description="List all Azure subscriptions available to the authenticated user. Use this to get subscription IDs that can be passed to other Azure CLI commands using --subscription parameter.",
-            content="""
-            # Validate environment variables
-            if [ -z "$AZURE_CLIENT_ID" ]; then
-                echo "❌ AZURE_CLIENT_ID environment variable is required"
-                exit 1
-            fi
-            
-            if [ -z "$AZURE_CLIENT_SECRET" ]; then
-                echo "❌ AZURE_CLIENT_SECRET environment variable is required"
-                exit 1
-            fi
-            
-            if [ -z "$AZURE_TENANT_ID" ]; then
-                echo "❌ AZURE_TENANT_ID environment variable is required"
-                exit 1
-            fi
-            
-            # Set up Azure CLI authentication using service principal
-            echo "🔐 Authenticating with Azure..."
-            az login --service-principal --username "$AZURE_CLIENT_ID" --password "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID" >/dev/null 2>&1 || {
-                echo "❌ Azure authentication failed"
-                exit 1
-            }
-            
-            echo "📋 Listing available Azure subscriptions:"
-            echo "----------------------------------------"
-            
-            # List subscriptions in a readable format
-            az account list --output table
-            
-            echo "----------------------------------------"
-            echo "💡 To use a specific subscription in azure_cli commands, add: --subscription 'subscription-id-or-name'"
-            """,
-            args=[]
-        )
 
     def azure_cli(self) -> AzureCLITool:
         """A flexible Azure CLI wrapper that allows AI to execute any az command."""

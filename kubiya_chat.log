@@ -1,0 +1,190 @@
+2025/07/21 11:06:11 chat.go:201: === Starting SendMessage ===
+2025/07/21 11:06:11 chat.go:202: Payload: {Message:list all azure subscriptions
+
+[SYSTEM] You have permission to execute READ-ONLY operations (kubectl get, describe, logs, etc.). You should execute these operations directly without asking for confirmation. AgentUUID:44d71e7a-ecf5-4a33-97da-23a303f61032 SessionID:c92168f0-5f10-46c7-a0ac-5c9405ba6506 UserEmail:michael.gonzalez@kubiya.ai Org:cocacola}
+2025/07/21 11:06:11 chat.go:206: Complete request payload: {
+  "message": "list all azure subscriptions\n\n[SYSTEM] You have permission to execute READ-ONLY operations (kubectl get, describe, logs, etc.). You should execute these operations directly without asking for confirmation.",
+  "agent_uuid": "44d71e7a-ecf5-4a33-97da-23a303f61032",
+  "session_id": "c92168f0-5f10-46c7-a0ac-5c9405ba6506",
+  "user_email": "michael.gonzalez@kubiya.ai",
+  "org": "cocacola"
+}
+2025/07/21 11:06:11 chat.go:209: Request URL: https://api.kubiya.ai/api/v1/hb/v4/stream
+2025/07/21 11:06:11 chat.go:210: User Email: 
+2025/07/21 11:06:11 chat.go:211: Organization: 
+2025/07/21 11:06:11 chat.go:240: === Request Headers ===
+2025/07/21 11:06:11 chat.go:247: Content-Type: application/json
+2025/07/21 11:06:11 chat.go:247: X-Vercel-Ai-Data-Stream: v1
+2025/07/21 11:06:11 chat.go:245: Authorization: UserKey [REDACTED]
+2025/07/21 11:06:11 chat.go:251: === End Headers ===
+2025/07/21 11:06:11 chat.go:252: Request body length: 384 bytes
+2025/07/21 11:06:22 chat.go:276: === HTTP Response Success ===
+2025/07/21 11:06:22 chat.go:277: Status Code: 200
+2025/07/21 11:06:22 chat.go:278: Status: 200 OK
+2025/07/21 11:06:22 chat.go:279: Response Headers:
+2025/07/21 11:06:22 chat.go:282:   X-Xss-Protection: 1; mode=block
+2025/07/21 11:06:22 chat.go:282:   Access-Control-Allow-Credentials: true
+2025/07/21 11:06:22 chat.go:282:   Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With
+2025/07/21 11:06:22 chat.go:282:   Access-Control-Allow-Methods: POST, DELETE, GET, PUT
+2025/07/21 11:06:22 chat.go:282:   Strict-Transport-Security: max-age=15724800; includeSubDomains
+2025/07/21 11:06:22 chat.go:282:   X-Frame-Options: DENY
+2025/07/21 11:06:22 chat.go:282:   Referrer-Policy: no-referrer
+2025/07/21 11:06:22 chat.go:282:   X-Content-Type-Options: nosniff
+2025/07/21 11:06:22 chat.go:282:   Date: Mon, 21 Jul 2025 15:06:11 GMT
+2025/07/21 11:06:22 chat.go:282:   Content-Type: text/event-stream; charset=utf-8
+2025/07/21 11:06:22 chat.go:282:   Access-Control-Allow-Origin: *
+2025/07/21 11:06:22 chat.go:282:   Content-Security-Policy: default-src 'self'
+2025/07/21 11:06:22 chat.go:282:   Feature-Policy: geolocation 'self' https://app.kubiya.ai; microphone 'none'
+2025/07/21 11:06:22 chat.go:285: Starting stream processing...
+2025/07/21 11:06:22 chat.go:286: === End HTTP Response Success ===
+2025/07/21 11:06:22 chat.go:407: Processing line 1: 9:{"toolCallId": "call_2GV09BKZ2NFIn3aC2iFUVjts", "toolName": "azure_subscriptions_list", "args": {}, "icon_url": "https://docs.microsoft.com/en-us/media/logos/logo_azure.svg"}
+2025/07/21 11:06:22 chat.go:417: [STREAM] Line 1: 9:{"toolCallId": "call_2GV09BKZ2NFIn3aC2iFUVjts", "toolName": "azure_subscriptions_list", "args": {}, "icon_url": "https://docs.microsoft.com/en-us/media/logos/logo_azure.svg"}
+2025/07/21 11:07:01 chat.go:407: Processing line 2: a:{"toolCallId": "call_2GV09BKZ2NFIn3aC2iFUVjts", "result": ""}
+2025/07/21 11:07:01 chat.go:417: [STREAM] Line 2: a:{"toolCallId": "call_2GV09BKZ2NFIn3aC2iFUVjts", "result": ""}
+2025/07/21 11:07:03 chat.go:407: Processing line 3: 0:"The"
+2025/07/21 11:07:03 chat.go:417: [STREAM] Line 3: 0:"The"
+2025/07/21 11:07:03 chat.go:407: Processing line 4: 0:" authentication"
+2025/07/21 11:07:03 chat.go:417: [STREAM] Line 4: 0:" authentication"
+2025/07/21 11:07:03 chat.go:407: Processing line 5: 0:" with"
+2025/07/21 11:07:03 chat.go:417: [STREAM] Line 5: 0:" with"
+2025/07/21 11:07:03 chat.go:407: Processing line 6: 0:" Azure"
+2025/07/21 11:07:03 chat.go:417: [STREAM] Line 6: 0:" Azure"
+2025/07/21 11:07:04 chat.go:407: Processing line 7: 0:" failed"
+2025/07/21 11:07:04 chat.go:417: [STREAM] Line 7: 0:" failed"
+2025/07/21 11:07:04 chat.go:407: Processing line 8: 0:"."
+2025/07/21 11:07:04 chat.go:417: [STREAM] Line 8: 0:"."
+2025/07/21 11:07:04 chat.go:407: Processing line 9: 0:" Please"
+2025/07/21 11:07:04 chat.go:417: [STREAM] Line 9: 0:" Please"
+2025/07/21 11:07:04 chat.go:407: Processing line 10: 0:" ensure"
+2025/07/21 11:07:04 chat.go:417: [STREAM] Line 10: 0:" ensure"
+2025/07/21 11:07:04 chat.go:407: Processing line 11: 0:" that"
+2025/07/21 11:07:04 chat.go:417: [STREAM] Line 11: 0:" that"
+2025/07/21 11:07:04 chat.go:407: Processing line 12: 0:" your"
+2025/07/21 11:07:04 chat.go:417: [STREAM] Line 12: 0:" your"
+2025/07/21 11:07:05 chat.go:407: Processing line 13: 0:" Azure"
+2025/07/21 11:07:05 chat.go:417: [STREAM] Line 13: 0:" Azure"
+2025/07/21 11:07:05 chat.go:407: Processing line 14: 0:" credentials"
+2025/07/21 11:07:05 chat.go:417: [STREAM] Line 14: 0:" credentials"
+2025/07/21 11:07:05 chat.go:407: Processing line 15: 0:" are"
+2025/07/21 11:07:05 chat.go:417: [STREAM] Line 15: 0:" are"
+2025/07/21 11:07:05 chat.go:407: Processing line 16: 0:" correctly"
+2025/07/21 11:07:05 chat.go:417: [STREAM] Line 16: 0:" correctly"
+2025/07/21 11:07:06 chat.go:407: Processing line 17: 0:" configured"
+2025/07/21 11:07:06 chat.go:417: [STREAM] Line 17: 0:" configured"
+2025/07/21 11:07:06 chat.go:407: Processing line 18: 0:" and"
+2025/07/21 11:07:06 chat.go:417: [STREAM] Line 18: 0:" and"
+2025/07/21 11:07:06 chat.go:407: Processing line 19: 0:" try"
+2025/07/21 11:07:06 chat.go:417: [STREAM] Line 19: 0:" try"
+2025/07/21 11:07:06 chat.go:407: Processing line 20: 0:" again"
+2025/07/21 11:07:06 chat.go:417: [STREAM] Line 20: 0:" again"
+2025/07/21 11:07:07 chat.go:407: Processing line 21: 0:"."
+2025/07/21 11:07:07 chat.go:417: [STREAM] Line 21: 0:"."
+2025/07/21 11:07:07 chat.go:407: Processing line 22: 0:" If"
+2025/07/21 11:07:07 chat.go:417: [STREAM] Line 22: 0:" If"
+2025/07/21 11:07:07 chat.go:407: Processing line 23: 0:" you"
+2025/07/21 11:07:07 chat.go:417: [STREAM] Line 23: 0:" you"
+2025/07/21 11:07:07 chat.go:407: Processing line 24: 0:" need"
+2025/07/21 11:07:07 chat.go:417: [STREAM] Line 24: 0:" need"
+2025/07/21 11:07:08 chat.go:407: Processing line 25: 0:" help"
+2025/07/21 11:07:08 chat.go:417: [STREAM] Line 25: 0:" help"
+2025/07/21 11:07:08 chat.go:407: Processing line 26: 0:" with"
+2025/07/21 11:07:08 chat.go:417: [STREAM] Line 26: 0:" with"
+2025/07/21 11:07:08 chat.go:407: Processing line 27: 0:" this"
+2025/07/21 11:07:08 chat.go:417: [STREAM] Line 27: 0:" this"
+2025/07/21 11:07:08 chat.go:407: Processing line 28: 0:","
+2025/07/21 11:07:08 chat.go:417: [STREAM] Line 28: 0:","
+2025/07/21 11:07:09 chat.go:407: Processing line 29: 0:" let"
+2025/07/21 11:07:09 chat.go:417: [STREAM] Line 29: 0:" let"
+2025/07/21 11:07:09 chat.go:407: Processing line 30: 0:" me"
+2025/07/21 11:07:09 chat.go:417: [STREAM] Line 30: 0:" me"
+2025/07/21 11:07:09 chat.go:407: Processing line 31: 0:" know"
+2025/07/21 11:07:09 chat.go:417: [STREAM] Line 31: 0:" know"
+2025/07/21 11:07:09 chat.go:407: Processing line 32: 0:"."
+2025/07/21 11:07:09 chat.go:417: [STREAM] Line 32: 0:"."
+2025/07/21 11:08:13 chat.go:201: === Starting SendMessage ===
+2025/07/21 11:08:13 chat.go:202: Payload: {Message:get current subscription
+
+[SYSTEM] You have permission to execute READ-ONLY operations (kubectl get, describe, logs, etc.). You should execute these operations directly without asking for confirmation. AgentUUID:44d71e7a-ecf5-4a33-97da-23a303f61032 SessionID:0fbcb86f-e10c-4998-9666-02342572a9f7 UserEmail:michael.gonzalez@kubiya.ai Org:cocacola}
+2025/07/21 11:08:13 chat.go:206: Complete request payload: {
+  "message": "get current subscription\n\n[SYSTEM] You have permission to execute READ-ONLY operations (kubectl get, describe, logs, etc.). You should execute these operations directly without asking for confirmation.",
+  "agent_uuid": "44d71e7a-ecf5-4a33-97da-23a303f61032",
+  "session_id": "0fbcb86f-e10c-4998-9666-02342572a9f7",
+  "user_email": "michael.gonzalez@kubiya.ai",
+  "org": "cocacola"
+}
+2025/07/21 11:08:13 chat.go:209: Request URL: https://api.kubiya.ai/api/v1/hb/v4/stream
+2025/07/21 11:08:13 chat.go:210: User Email: 
+2025/07/21 11:08:13 chat.go:211: Organization: 
+2025/07/21 11:08:13 chat.go:240: === Request Headers ===
+2025/07/21 11:08:13 chat.go:247: Content-Type: application/json
+2025/07/21 11:08:13 chat.go:247: X-Vercel-Ai-Data-Stream: v1
+2025/07/21 11:08:13 chat.go:245: Authorization: UserKey [REDACTED]
+2025/07/21 11:08:13 chat.go:251: === End Headers ===
+2025/07/21 11:08:13 chat.go:252: Request body length: 380 bytes
+2025/07/21 11:08:37 chat.go:276: === HTTP Response Success ===
+2025/07/21 11:08:37 chat.go:277: Status Code: 200
+2025/07/21 11:08:37 chat.go:278: Status: 200 OK
+2025/07/21 11:08:37 chat.go:279: Response Headers:
+2025/07/21 11:08:37 chat.go:282:   Feature-Policy: geolocation 'self' https://app.kubiya.ai; microphone 'none'
+2025/07/21 11:08:37 chat.go:282:   Strict-Transport-Security: max-age=15724800; includeSubDomains
+2025/07/21 11:08:37 chat.go:282:   X-Content-Type-Options: nosniff
+2025/07/21 11:08:37 chat.go:282:   X-Frame-Options: DENY
+2025/07/21 11:08:37 chat.go:282:   Date: Mon, 21 Jul 2025 15:08:13 GMT
+2025/07/21 11:08:37 chat.go:282:   Content-Type: text/event-stream; charset=utf-8
+2025/07/21 11:08:37 chat.go:282:   Access-Control-Allow-Credentials: true
+2025/07/21 11:08:37 chat.go:282:   Content-Security-Policy: default-src 'self'
+2025/07/21 11:08:37 chat.go:282:   X-Xss-Protection: 1; mode=block
+2025/07/21 11:08:37 chat.go:282:   Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With
+2025/07/21 11:08:37 chat.go:282:   Access-Control-Allow-Methods: POST, DELETE, GET, PUT
+2025/07/21 11:08:37 chat.go:282:   Access-Control-Allow-Origin: *
+2025/07/21 11:08:37 chat.go:282:   Referrer-Policy: no-referrer
+2025/07/21 11:08:37 chat.go:285: Starting stream processing...
+2025/07/21 11:08:37 chat.go:286: === End HTTP Response Success ===
+2025/07/21 11:08:37 chat.go:407: Processing line 1: 9:{"toolCallId": "call_U1SiRgsOWmktFw0ZZMZLaERe", "toolName": "azure_subscriptions_list", "args": {}, "icon_url": "https://docs.microsoft.com/en-us/media/logos/logo_azure.svg"}
+2025/07/21 11:08:37 chat.go:417: [STREAM] Line 1: 9:{"toolCallId": "call_U1SiRgsOWmktFw0ZZMZLaERe", "toolName": "azure_subscriptions_list", "args": {}, "icon_url": "https://docs.microsoft.com/en-us/media/logos/logo_azure.svg"}
+2025/07/21 11:08:48 chat.go:407: Processing line 2: a:{"toolCallId": "call_U1SiRgsOWmktFw0ZZMZLaERe", "result": ""}
+2025/07/21 11:08:48 chat.go:417: [STREAM] Line 2: a:{"toolCallId": "call_U1SiRgsOWmktFw0ZZMZLaERe", "result": ""}
+2025/07/21 11:08:50 chat.go:407: Processing line 3: 0:"It"
+2025/07/21 11:08:50 chat.go:417: [STREAM] Line 3: 0:"It"
+2025/07/21 11:08:51 chat.go:407: Processing line 4: 0:" seems"
+2025/07/21 11:08:51 chat.go:417: [STREAM] Line 4: 0:" seems"
+2025/07/21 11:08:54 chat.go:407: Processing line 5: 0:" that"
+2025/07/21 11:08:54 chat.go:417: [STREAM] Line 5: 0:" that"
+2025/07/21 11:08:55 chat.go:407: Processing line 6: 0:" the"
+2025/07/21 11:08:55 chat.go:417: [STREAM] Line 6: 0:" the"
+2025/07/21 11:08:56 chat.go:407: Processing line 7: 0:" authentication"
+2025/07/21 11:08:56 chat.go:417: [STREAM] Line 7: 0:" authentication"
+2025/07/21 11:08:58 chat.go:407: Processing line 8: 0:" with"
+2025/07/21 11:08:58 chat.go:417: [STREAM] Line 8: 0:" with"
+2025/07/21 11:08:59 chat.go:407: Processing line 9: 0:" Azure"
+2025/07/21 11:08:59 chat.go:417: [STREAM] Line 9: 0:" Azure"
+2025/07/21 11:09:00 chat.go:407: Processing line 10: 0:" failed"
+2025/07/21 11:09:00 chat.go:417: [STREAM] Line 10: 0:" failed"
+2025/07/21 11:09:01 chat.go:407: Processing line 11: 0:"."
+2025/07/21 11:09:01 chat.go:417: [STREAM] Line 11: 0:"."
+2025/07/21 11:09:02 chat.go:407: Processing line 12: 0:" Please"
+2025/07/21 11:09:02 chat.go:417: [STREAM] Line 12: 0:" Please"
+2025/07/21 11:09:04 chat.go:407: Processing line 13: 0:" ensure"
+2025/07/21 11:09:04 chat.go:417: [STREAM] Line 13: 0:" ensure"
+2025/07/21 11:09:05 chat.go:407: Processing line 14: 0:" that"
+2025/07/21 11:09:05 chat.go:417: [STREAM] Line 14: 0:" that"
+2025/07/21 11:09:07 chat.go:407: Processing line 15: 0:" your"
+2025/07/21 11:09:07 chat.go:417: [STREAM] Line 15: 0:" your"
+2025/07/21 11:09:08 chat.go:407: Processing line 16: 0:" credentials"
+2025/07/21 11:09:08 chat.go:417: [STREAM] Line 16: 0:" credentials"
+2025/07/21 11:09:09 chat.go:407: Processing line 17: 0:" are"
+2025/07/21 11:09:09 chat.go:417: [STREAM] Line 17: 0:" are"
+2025/07/21 11:09:12 chat.go:407: Processing line 18: 0:" set"
+2025/07/21 11:09:12 chat.go:417: [STREAM] Line 18: 0:" set"
+2025/07/21 11:09:14 chat.go:407: Processing line 19: 0:" up"
+2025/07/21 11:09:14 chat.go:417: [STREAM] Line 19: 0:" up"
+2025/07/21 11:09:15 chat.go:407: Processing line 20: 0:" correctly"
+2025/07/21 11:09:15 chat.go:417: [STREAM] Line 20: 0:" correctly"
+2025/07/21 11:09:17 chat.go:407: Processing line 21: 0:"."
+2025/07/21 11:09:17 chat.go:417: [STREAM] Line 21: 0:"."
+2025/07/21 11:09:17 chat.go:407: Processing line 22: 0:" If"
+2025/07/21 11:09:17 chat.go:417: [STREAM] Line 22: 0:" If"
+2025/07/21 11:09:19 chat.go:407: Processing line 23: 0:" you"
+2025/07/21 11:09:19 chat.go:417: [STREAM] Line 23: 0:" you"
+2025/07/21 11:09:19 chat.go:407: Processing line 24: 0:" need"
+2025/07/21 11:09:19 chat.go:417: [STREAM] Line 24: 0:" need"
