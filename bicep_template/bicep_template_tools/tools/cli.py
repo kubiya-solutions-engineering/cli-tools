@@ -9,10 +9,10 @@ class CLITools:
     def __init__(self):
         """Initialize and register the Bicep template tools."""
         try:
-            # Register the full deployment tool
-            tool = self.bicep_template()
-            tool_registry.register("bicep_template", tool)
-            print(f"✅ Registered: {tool.name}")
+            # # Register the full deployment tool
+            # tool = self.bicep_template()
+            # tool_registry.register("bicep_template", tool)
+            # print(f"✅ Registered: {tool.name}")
             
             # Register the validation-only tool
             validate_tool = self.bicep_template_validate()
