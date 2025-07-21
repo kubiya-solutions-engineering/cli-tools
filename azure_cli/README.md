@@ -13,6 +13,7 @@ This package provides a flexible tool that wraps the Azure CLI (`az`) command-li
 - **Flexible Subscriptions**: List and dynamically choose Azure subscriptions
 - **Flexible**: Supports all current and future Azure CLI commands
 - **Simple**: Two tools - one for listing subscriptions and one for executing commands
+- **Fast & Reliable**: Uses official Microsoft Azure CLI Docker image
 - **Authenticated**: Automatic Azure authentication handling
 
 ## Available Tools
@@ -214,12 +215,19 @@ pip install -e .
 ## Docker Usage
 
 ```bash
-# Build the Docker image
+# Build the Docker image (uses official Azure CLI image as base)
 docker build -t azure-cli-tools .
 
 # Run with environment variables
 docker run -e AZURE_CLIENT_ID=your_client_id -e AZURE_CLIENT_SECRET=your_secret -e AZURE_TENANT_ID=your_tenant azure-cli-tools
 ```
+
+**Note**: This tool uses the official Microsoft Azure CLI Docker image (`mcr.microsoft.com/azure-cli:latest`) as its base, which provides:
+- ✅ Pre-installed Azure CLI (no installation time)
+- ✅ Always up-to-date with latest Azure CLI version
+- ✅ Optimized and maintained by Microsoft
+- ✅ Faster startup times
+- ✅ Smaller attack surface
 
 ## Error Handling
 

@@ -46,10 +46,7 @@ class CLITools:
             
             # Set up Azure CLI authentication using service principal
             echo "🔐 Authenticating with Azure..."
-            az login --service-principal \\
-                --username "$AZURE_CLIENT_ID" \\
-                --password "$AZURE_CLIENT_SECRET" \\
-                --tenant "$AZURE_TENANT_ID" >/dev/null 2>&1 || {
+            az login --service-principal --username "$AZURE_CLIENT_ID" --password "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID" >/dev/null 2>&1 || {
                 echo "❌ Azure authentication failed"
                 exit 1
             }
