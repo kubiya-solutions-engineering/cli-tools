@@ -45,19 +45,17 @@ class CLITools:
             fi
             
             # Install required packages
-            apk add --no-cache python3 py3-pip jq curl bash git >/dev/null 2>&1 || {
+            echo "📦 Installing required packages..."
+            apk add --no-cache python3 py3-pip jq curl bash git gcc musl-dev libffi-dev openssl-dev python3-dev >/dev/null 2>&1 || {
                 echo "❌ Failed to install required packages"
                 exit 1
             }
             
-            # Install Azure CLI
+            # Install Azure CLI using pip (recommended method for Alpine)
             echo "🔧 Installing Azure CLI..."
-            curl -sL https://aka.ms/InstallAzureCLIDeb | bash >/dev/null 2>&1 || {
-                # Fallback installation method for Alpine
-                pip3 install azure-cli >/dev/null 2>&1 || {
-                    echo "❌ Failed to install Azure CLI"
-                    exit 1
-                }
+            pip3 install --no-cache-dir azure-cli || {
+                echo "❌ Failed to install Azure CLI"
+                exit 1
             }
             
             # Set up Azure CLI authentication using service principal
@@ -117,19 +115,17 @@ class CLITools:
             fi
             
             # Install required packages
-            apk add --no-cache python3 py3-pip jq curl bash git >/dev/null 2>&1 || {
+            echo "📦 Installing required packages..."
+            apk add --no-cache python3 py3-pip jq curl bash git gcc musl-dev libffi-dev openssl-dev python3-dev >/dev/null 2>&1 || {
                 echo "❌ Failed to install required packages"
                 exit 1
             }
             
-            # Install Azure CLI
+            # Install Azure CLI using pip (recommended method for Alpine)
             echo "🔧 Installing Azure CLI..."
-            curl -sL https://aka.ms/InstallAzureCLIDeb | bash >/dev/null 2>&1 || {
-                # Fallback installation method for Alpine
-                pip3 install azure-cli >/dev/null 2>&1 || {
-                    echo "❌ Failed to install Azure CLI"
-                    exit 1
-                }
+            pip3 install --no-cache-dir azure-cli || {
+                echo "❌ Failed to install Azure CLI"
+                exit 1
             }
             
             # Set up Azure CLI authentication using service principal
