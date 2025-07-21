@@ -44,20 +44,6 @@ class CLITools:
                 exit 1
             fi
             
-            # Install required packages
-            echo "📦 Installing required packages..."
-            apk add --no-cache python3 py3-pip jq curl bash git gcc musl-dev libffi-dev openssl-dev python3-dev >/dev/null 2>&1 || {
-                echo "❌ Failed to install required packages"
-                exit 1
-            }
-            
-            # Install Azure CLI using pip (with system packages override for Docker)
-            echo "🔧 Installing Azure CLI..."
-            pip3 install --no-cache-dir --break-system-packages azure-cli || {
-                echo "❌ Failed to install Azure CLI"
-                exit 1
-            }
-            
             # Set up Azure CLI authentication using service principal
             echo "🔐 Authenticating with Azure..."
             az login --service-principal \\
@@ -113,20 +99,6 @@ class CLITools:
                 echo "💡 Use azure_subscriptions_list tool first to see available subscriptions"
                 exit 1
             fi
-            
-            # Install required packages
-            echo "📦 Installing required packages..."
-            apk add --no-cache python3 py3-pip jq curl bash git gcc musl-dev libffi-dev openssl-dev python3-dev >/dev/null 2>&1 || {
-                echo "❌ Failed to install required packages"
-                exit 1
-            }
-            
-            # Install Azure CLI using pip (with system packages override for Docker)
-            echo "🔧 Installing Azure CLI..."
-            pip3 install --no-cache-dir --break-system-packages azure-cli || {
-                echo "❌ Failed to install Azure CLI"
-                exit 1
-            }
             
             # Set up Azure CLI authentication using service principal
             echo "🔐 Authenticating with Azure..."

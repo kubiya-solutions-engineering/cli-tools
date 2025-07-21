@@ -36,12 +36,12 @@ class AzureCLITool(Tool):
     description: str
     content: str = ""
     args: List[Arg] = []
-    image: str = "alpine:latest"
+    image: str = "mcr.microsoft.com/azure-cli:latest"
     icon_url: str = AZURE_CLI_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
     
-    def __init__(self, name, description, content, args=None, image="alpine:latest"):
+    def __init__(self, name, description, content, args=None, image="mcr.microsoft.com/azure-cli:latest"):
         content = content
         
         super().__init__(

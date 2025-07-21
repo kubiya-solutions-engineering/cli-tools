@@ -1324,3 +1324,45 @@
 2025/07/21 10:47:27 chat.go:417: [STREAM] Line 76: 0:" requests"
 2025/07/21 10:47:27 chat.go:407: Processing line 77: 0:"?"
 2025/07/21 10:47:27 chat.go:417: [STREAM] Line 77: 0:"?"
+2025/07/21 10:49:00 chat.go:201: === Starting SendMessage ===
+2025/07/21 10:49:00 chat.go:202: Payload: {Message:list all azure subscriptions
+
+[SYSTEM] You have permission to execute READ-ONLY operations (kubectl get, describe, logs, etc.). You should execute these operations directly without asking for confirmation. AgentUUID:44d71e7a-ecf5-4a33-97da-23a303f61032 SessionID:bf19ff44-c606-43c3-b892-ba421ee1abd5 UserEmail:michael.gonzalez@kubiya.ai Org:cocacola}
+2025/07/21 10:49:00 chat.go:206: Complete request payload: {
+  "message": "list all azure subscriptions\n\n[SYSTEM] You have permission to execute READ-ONLY operations (kubectl get, describe, logs, etc.). You should execute these operations directly without asking for confirmation.",
+  "agent_uuid": "44d71e7a-ecf5-4a33-97da-23a303f61032",
+  "session_id": "bf19ff44-c606-43c3-b892-ba421ee1abd5",
+  "user_email": "michael.gonzalez@kubiya.ai",
+  "org": "cocacola"
+}
+2025/07/21 10:49:00 chat.go:209: Request URL: https://api.kubiya.ai/api/v1/hb/v4/stream
+2025/07/21 10:49:00 chat.go:210: User Email: 
+2025/07/21 10:49:00 chat.go:211: Organization: 
+2025/07/21 10:49:00 chat.go:240: === Request Headers ===
+2025/07/21 10:49:00 chat.go:247: Content-Type: application/json
+2025/07/21 10:49:00 chat.go:247: X-Vercel-Ai-Data-Stream: v1
+2025/07/21 10:49:00 chat.go:245: Authorization: UserKey [REDACTED]
+2025/07/21 10:49:00 chat.go:251: === End Headers ===
+2025/07/21 10:49:00 chat.go:252: Request body length: 384 bytes
+2025/07/21 10:49:18 chat.go:276: === HTTP Response Success ===
+2025/07/21 10:49:18 chat.go:277: Status Code: 200
+2025/07/21 10:49:18 chat.go:278: Status: 200 OK
+2025/07/21 10:49:18 chat.go:279: Response Headers:
+2025/07/21 10:49:18 chat.go:282:   Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With
+2025/07/21 10:49:18 chat.go:282:   Content-Security-Policy: default-src 'self'
+2025/07/21 10:49:18 chat.go:282:   Referrer-Policy: no-referrer
+2025/07/21 10:49:18 chat.go:282:   X-Content-Type-Options: nosniff
+2025/07/21 10:49:18 chat.go:282:   X-Xss-Protection: 1; mode=block
+2025/07/21 10:49:18 chat.go:282:   Access-Control-Allow-Credentials: true
+2025/07/21 10:49:18 chat.go:282:   Content-Type: text/event-stream; charset=utf-8
+2025/07/21 10:49:18 chat.go:282:   Access-Control-Allow-Methods: POST, DELETE, GET, PUT
+2025/07/21 10:49:18 chat.go:282:   Access-Control-Allow-Origin: *
+2025/07/21 10:49:18 chat.go:282:   Feature-Policy: geolocation 'self' https://app.kubiya.ai; microphone 'none'
+2025/07/21 10:49:18 chat.go:282:   Strict-Transport-Security: max-age=15724800; includeSubDomains
+2025/07/21 10:49:18 chat.go:282:   X-Frame-Options: DENY
+2025/07/21 10:49:18 chat.go:282:   Date: Mon, 21 Jul 2025 14:49:00 GMT
+2025/07/21 10:49:18 chat.go:285: Starting stream processing...
+2025/07/21 10:49:18 chat.go:286: === End HTTP Response Success ===
+2025/07/21 10:49:18 chat.go:407: Processing line 1: 9:{"toolCallId": "call_svBdRCmpLMU6wg4EQCnnnloJ", "toolName": "azure_subscriptions_list", "args": {}, "icon_url": "https://docs.microsoft.com/en-us/media/logos/logo_azure.svg"}
+2025/07/21 10:49:18 chat.go:417: [STREAM] Line 1: 9:{"toolCallId": "call_svBdRCmpLMU6wg4EQCnnnloJ", "toolName": "azure_subscriptions_list", "args": {}, "icon_url": "https://docs.microsoft.com/en-us/media/logos/logo_azure.svg"}
+2025/07/21 10:50:18 chat.go:625: Scanner error: stream error: stream ID 5; INTERNAL_ERROR; received from peer
