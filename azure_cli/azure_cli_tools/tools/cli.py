@@ -51,9 +51,9 @@ class CLITools:
                 exit 1
             }
             
-            # Install Azure CLI using pip (recommended method for Alpine)
+            # Install Azure CLI using pip (with system packages override for Docker)
             echo "🔧 Installing Azure CLI..."
-            pip3 install --no-cache-dir azure-cli || {
+            pip3 install --no-cache-dir --break-system-packages azure-cli || {
                 echo "❌ Failed to install Azure CLI"
                 exit 1
             }
@@ -121,9 +121,9 @@ class CLITools:
                 exit 1
             }
             
-            # Install Azure CLI using pip (recommended method for Alpine)
+            # Install Azure CLI using pip (with system packages override for Docker)
             echo "🔧 Installing Azure CLI..."
-            pip3 install --no-cache-dir azure-cli || {
+            pip3 install --no-cache-dir --break-system-packages azure-cli || {
                 echo "❌ Failed to install Azure CLI"
                 exit 1
             }
