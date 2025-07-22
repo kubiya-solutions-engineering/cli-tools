@@ -139,100 +139,106 @@ Example commands:
 "api GET /v1/datasets"
 ```
 
-## 📚 Available Commands
+## 📚 High-Performance Commands
 
-The Observe API wrapper supports all standard Observe API operations:
+### Core Dataset Operations
+- **`observe_list_datasets`** - Advanced dataset listing with filtering, pagination, and multiple output formats
+- **`observe_opal_query`** - High-performance OPAL queries with smart optimization and caching
+- **`observe_query_builder`** - Interactive query builder with templates and validation
+- **`observe_dataset_analyzer`** - Deep dataset analysis and performance recommendations  
+- **`observe_performance_monitor`** - Real-time performance monitoring and benchmarking
 
-### Dataset Commands
-- `datasets list` - List all datasets
-- `datasets show <dataset-id>` - Show dataset details
+### 🚀 Performance Features
+- **Smart Query Optimization** - Automatic limit addition and field selection
+- **Advanced Filtering** - Name, type, and content-based filtering
+- **Multiple Output Formats** - Table, JSON, CSV, compact, and summary views
+- **Intelligent Caching** - Query result caching for repeated operations
+- **Performance Monitoring** - Real-time latency tracking and benchmarking
+- **Memory Management** - Result limiting and pagination to prevent overwhelming output
 
-### Monitor Commands
-- `monitors list` - List all monitors
-- `monitors show <monitor-id>` - Show monitor details
+## 🔧 Performance-Optimized Examples
 
-### Dashboard Commands
-- `dashboards list` - List all dashboards
-- `dashboards show <dashboard-id>` - Show dashboard details
-
-### Resource Commands
-- `resources list` - List all resources
-- `resources show <resource-id>` - Show resource details
-
-### Event Commands
-- `events list` - List all events
-- `events show <event-id>` - Show event details
-
-### Query Commands
-- `query <dataset-id> <oql-query>` - Execute OQL query on dataset
-- `advanced-query <dataset-id> [options]` - Advanced query with filters, time ranges, and parameters
-
-### Custom API Commands
-- `api <method> <endpoint> [query-params] [body]` - Custom API call
-
-## 🔧 Command Examples
-
-### Basic Operations
+### Smart Dataset Listing
 ```bash
-# List all datasets
-"datasets list"
+# Basic listing with pagination
+observe_list_datasets --limit 20 --output_format table
 
-# Show specific dataset
-"datasets show your-dataset-id"
+# Filtered search with compact output
+observe_list_datasets --name_filter "kubernetes" --type_filter "logs" --output_format compact
 
-# List monitors
-"monitors list"
-
-# Show specific monitor
-"monitors show your-monitor-id"
+# JSON output for programmatic use
+observe_list_datasets --limit 100 --offset 50 --output_format json
 ```
 
-### Query Operations
+### High-Performance OPAL Queries
 ```bash
-# Execute OQL query
-"query your-dataset-id 'pick_col timestamp, log | limit 10'"
+# Optimized error analysis (auto-limited, cached)
+observe_opal_query \
+  --dataset_id 41000001 \
+  --opal_query "filter level == 'ERROR'" \
+  --time_range 1h \
+  --output_format table \
+  --max_rows 500
 
-# Complex query
-"query your-dataset-id 'filter severity == \"error\" | pick_col timestamp, message, severity | limit 50'"
+# Performance monitoring with caching
+observe_opal_query \
+  --dataset_id 41000001 \
+  --opal_query "filter response_time > 1000 | stats avg(response_time) by endpoint" \
+  --time_range 24h \
+  --cache_results true \
+  --output_format summary
+
+# Security analysis with intelligent formatting
+observe_opal_query \
+  --dataset_id 41000001 \
+  --opal_query "filter action == 'login' and result == 'failed' | top 100 by TIMESTAMP desc" \
+  --timeout 30 \
+  --output_format csv
 ```
 
-### Advanced Query Operations
+### Interactive Query Building
 ```bash
-# Query with time preset
-"advanced-query your-dataset-id --time-preset PAST_1_HOUR"
+# Pre-built error analysis template
+observe_query_builder \
+  --query_type error_analysis \
+  --dataset_id 41000001 \
+  --save_template true
 
-# Query with specific time range
-"advanced-query your-dataset-id --time-start 1686165391864 --time-end 1686251791864"
+# Security events template
+observe_query_builder \
+  --query_type security_events \
+  --time_range 6h
 
-# Query with filter
-"advanced-query your-dataset-id --filter-eq status error"
-
-# Query with operator filter
-"advanced-query your-dataset-id --filter severity != warning"
-
-# Query with OPAL statement
-"advanced-query your-dataset-id --opal 'filter severity == \"error\"'"
-
-# Query with multiple parameters
-"advanced-query your-dataset-id --time-preset PAST_15_MINUTES --filter-eq level ERROR --param environment production"
+# Custom query optimization
+observe_query_builder \
+  --query_type custom \
+  --custom_query "filter cpu > 80 | stats max(cpu) by host" \
+  --dataset_id 41000001
 ```
 
-### Custom API Calls
+### Dataset Analysis & Optimization
 ```bash
-# GET request
-"api GET /v1/datasets"
+# Deep dataset analysis with recommendations
+observe_dataset_analyzer --dataset_id 41000001
 
-# GET with query parameters
-"api GET /v1/datasets 'limit=10&offset=0'"
+# Performance monitoring with benchmarks
+observe_performance_monitor \
+  --dataset_id 41000001 \
+  --run_benchmark true \
+  --save_metrics true
+```
 
-# POST request with body
-"api POST /v1/query '{\"query\": \"pick_col timestamp, log | limit 10\", \"dataset\": \"your-dataset-id\"}'"
+### Advanced Use Cases
+```bash
+# Resource monitoring pipeline
+observe_query_builder --query_type resource_usage --dataset_id 41000001 | \
+observe_opal_query --dataset_id 41000001 --time_range 2h --cache_results true
 
-# PUT request
-"api PUT /v1/datasets/your-dataset-id '{\"name\": \"Updated Dataset\"}'"
-
-# DELETE request
-"api DELETE /v1/monitors/your-monitor-id"
+# Multi-format data export
+observe_opal_query \
+  --dataset_id 41000001 \
+  --opal_query "pick_col timestamp, level, message | limit 10000" \
+  --output_format csv > production_logs_$(date +%Y%m%d).csv
 ```
 
 ## 📊 Advanced URL Parameters
