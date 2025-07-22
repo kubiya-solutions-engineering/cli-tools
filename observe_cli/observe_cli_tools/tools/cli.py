@@ -31,13 +31,13 @@ class CLITools:
     def execute_opal_query(self) -> ObserveCLITool:
         """Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, 
         optionally filtered by content in any field. Supports field selection for performance optimization with large records. 
-        Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."""
+        Automatically uses dataset IDs from US_DATASET_IDS or EU_DATASET_IDS environment variable. AI can parse and analyze the returned data."""
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
                 "Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, "
                 "optionally filtered by content in any field. Supports field selection for performance optimization with large records. "
-                "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
+                "Automatically uses dataset IDs from US_DATASET_IDS or EU_DATASET_IDS environment variable and selects the appropriate regional endpoint."
             ),
             content="""
             #!/bin/sh
@@ -49,9 +49,20 @@ class CLITools:
                 exit 1
             fi
             
-            if [ -z "$DATASET_IDS" ]; then
-                echo "❌ DATASET_IDS environment variable is required"
-                echo "Example: export DATASET_IDS=\"40001202,40001240\""
+            # Determine region and dataset IDs based on environment variables
+            if [ -n "$US_DATASET_IDS" ] && [ -n "$EU_DATASET_IDS" ]; then
+                echo "❌ Both US_DATASET_IDS and EU_DATASET_IDS are set. Please use only one."
+                exit 1
+            elif [ -n "$US_DATASET_IDS" ]; then
+                DATASET_IDS="$US_DATASET_IDS"
+                REGION="us-1"
+                echo "🇺🇸 Using US region with dataset IDs: $DATASET_IDS"
+            elif [ -n "$EU_DATASET_IDS" ]; then
+                DATASET_IDS="$EU_DATASET_IDS"
+                REGION="eu-1"
+                echo "🇪🇺 Using EU region with dataset IDs: $DATASET_IDS"
+            else
+                echo "❌ Either US_DATASET_IDS or EU_DATASET_IDS environment variable is required"
                 exit 1
             fi
             
@@ -160,20 +171,20 @@ class CLITools:
             
             # Validate that the query was constructed successfully
             if [ -z "$QUERY_JSON" ] || ! echo "$QUERY_JSON" | jq empty 2>/dev/null; then
-                echo "❌ Failed to construct query JSON from DATASET_IDS: $DATASET_IDS"
+                echo "❌ Failed to construct query JSON from dataset IDs: $DATASET_IDS"
                 exit 1
             fi
             
             # Validate that we have at least one dataset input
             INPUT_COUNT=$(echo "$QUERY_JSON" | jq -r '.query.stages[0].input | length')
             if [ "$INPUT_COUNT" -eq 0 ]; then
-                echo "❌ No valid dataset IDs found in DATASET_IDS: $DATASET_IDS"
+                echo "❌ No valid dataset IDs found in dataset IDs: $DATASET_IDS"
                 exit 1
             fi
             
-            # Use known working API endpoint
-            API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com"
-            echo "✅ Using region: eu-1"
+            # Use region-specific API endpoint
+            API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
+            echo "✅ Using region: $REGION"
             
             # Build API URL with time parameters
             API_URL="$API_BASE_URL/v1/meta/export/query"
@@ -394,7 +405,7 @@ class CLITools:
         """Analyze dataset structure, performance, and optimization opportunities."""
         return ObserveCLITool(
             name="observe_dataset_analyzer", 
-            description="Deep analysis of dataset structure, field distribution, performance metrics, and optimization recommendations. Provides insights for better query performance.",
+            description="Deep analysis of dataset structure, field distribution, performance metrics, and optimization recommendations. Uses region-specific endpoints. Provides insights for better query performance.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -406,21 +417,40 @@ class CLITools:
                 exit 1
             fi
             
+            # Determine region based on environment variables
+            if [ -n "$US_DATASET_IDS" ] && [ -n "$EU_DATASET_IDS" ]; then
+                echo "❌ Both US_DATASET_IDS and EU_DATASET_IDS are set. Please use only one."
+                exit 1
+            elif [ -n "$US_DATASET_IDS" ]; then
+                REGION="us-1"
+                echo "🇺🇸 Using US region for dataset analysis"
+            elif [ -n "$EU_DATASET_IDS" ]; then
+                REGION="eu-1"  
+                echo "🇪🇺 Using EU region for dataset analysis"
+            else
+                # Default to EU if no region variables are set (backward compatibility)
+                REGION="eu-1"
+                echo "⚠️  No region environment variables set, defaulting to EU region"
+                echo "💡 Set US_DATASET_IDS or EU_DATASET_IDS for explicit region selection"
+            fi
+            
             echo "🔬 Dataset Analysis Report"
             echo "========================="
             echo "Dataset ID: $dataset_id"
+            echo "Region: $REGION"
             echo "Timestamp: $(date)"
             echo ""
             
             # Get dataset metadata
             echo "📊 Fetching dataset metadata..."
             DATASET_INFO=$(curl -s --max-time 30 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$dataset_id" \
+                "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset/$dataset_id" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" 2>/dev/null)
             
             if [ $? -ne 0 ]; then
                 echo "❌ Failed to fetch dataset metadata"
+                echo "💡 Verify dataset ID exists in $REGION region"
                 exit 1
             fi
             
@@ -452,7 +482,7 @@ class CLITools:
                 }')
             
             SAMPLE_DATA=$(curl -s --max-time 30 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query" \
+                "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/meta/export/query" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
                 --request POST \
@@ -538,7 +568,7 @@ class CLITools:
         """Monitor query performance and system health."""
         return ObserveCLITool(
             name="observe_performance_monitor",
-            description="Monitor Observe API performance, track query execution times, and provide system health insights. Includes performance benchmarking and optimization tracking.",
+            description="Monitor Observe API performance, track query execution times, and provide system health insights. Uses region-specific endpoints. Includes performance benchmarking and optimization tracking.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -555,12 +585,30 @@ class CLITools:
                 exit 1
             fi
             
+            # Determine region based on environment variables
+            if [ -n "$US_DATASET_IDS" ] && [ -n "$EU_DATASET_IDS" ]; then
+                echo "❌ Both US_DATASET_IDS and EU_DATASET_IDS are set. Please use only one."
+                exit 1
+            elif [ -n "$US_DATASET_IDS" ]; then
+                REGION="us-1"
+                echo "🇺🇸 Using US region for performance monitoring"
+            elif [ -n "$EU_DATASET_IDS" ]; then
+                REGION="eu-1"  
+                echo "🇪🇺 Using EU region for performance monitoring"
+            else
+                # Default to EU if no region variables are set (backward compatibility)
+                REGION="eu-1"
+                echo "⚠️  No region environment variables set, defaulting to EU region"
+                echo "💡 Set US_DATASET_IDS or EU_DATASET_IDS for explicit region selection"
+            fi
+            
             # API Health Check
-            echo "🏥 API Health Check:"
+            echo ""
+            echo "🏥 API Health Check ($REGION):"
             START_TIME=$(date +%s%3N)
             
             HEALTH_RESPONSE=$(curl -s --max-time 10 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?limit=1" \
+                "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset?limit=1" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" 2>/dev/null)
             
@@ -603,7 +651,7 @@ class CLITools:
                             }')
                         
                         BENCHMARK_RESPONSE=$(curl -s --max-time 60 --fail \
-                            "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query" \
+                            "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/meta/export/query" \
                             --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                             --header "Content-Type: application/json" \
                             --request POST \
@@ -657,11 +705,13 @@ class CLITools:
                     --arg timestamp "$(date -Iseconds)" \
                     --arg api_latency "$API_LATENCY" \
                     --arg api_status "$HEALTH_EXIT_CODE" \
+                    --arg region "$REGION" \
                     '{
                         "timestamp": $timestamp,
                         "api_latency_ms": ($api_latency | tonumber),
                         "api_healthy": ($api_status == "0"),
-                        "customer_id": "'$OBSERVE_CUSTOMER_ID'"
+                        "customer_id": "'$OBSERVE_CUSTOMER_ID'",
+                        "region": $region
                     }' > "$METRICS_FILE"
                 echo ""
                 echo "📊 Performance metrics saved to workspace: observe-data/metrics/performance_$(date +%Y%m%d_%H%M%S).json"
