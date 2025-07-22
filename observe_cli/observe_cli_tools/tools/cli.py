@@ -33,7 +33,7 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Returns the latest 100 records from the specified time interval. "
+                "Execute OPAL queries on Observe datasets. Returns all data from the specified time interval (up to 10000 records). "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
             ),
             content="""
@@ -63,11 +63,11 @@ class CLITools:
             start_time="$start_time"
             end_time="$end_time"
             
-            # Hardcoded query that works reliably
-            opal_pipeline="limit 100"
+            # Hardcoded query that works reliably - gets all data from time interval
+            opal_pipeline="pick_col *"
             
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            echo "📝 OPAL pipeline: $opal_pipeline"
+            echo "📝 OPAL pipeline: $opal_pipeline (gets all data from time interval)"
             echo ""
             
             # Parse dataset IDs and determine the input structure
@@ -113,41 +113,9 @@ class CLITools:
                 exit 1
             fi
             
-            # Determine API endpoint - try different patterns
-            API_BASE_URL=""
-            
-            # Common Observe regions to try
-            REGIONS="eu-1 us-1 ap-1 us-east-1 us-west-1"
-            
-            for REGION in $REGIONS; do
-                URL_PATTERN="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
-                
-                if curl -s --max-time 5 --fail "$URL_PATTERN/v1/dataset?limit=1" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                    --header "Content-Type: application/json" >/dev/null 2>&1; then
-                    API_BASE_URL="$URL_PATTERN"
-                    echo "✅ Using region: $REGION"
-                    break
-                fi
-            done
-            
-            # Also try without region subdomain
-            if [ -z "$API_BASE_URL" ]; then
-                URL_PATTERN="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
-                
-                if curl -s --max-time 5 --fail "$URL_PATTERN/v1/dataset?limit=1" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                    --header "Content-Type: application/json" >/dev/null 2>&1; then
-                    API_BASE_URL="$URL_PATTERN"
-                    echo "✅ Using direct customer URL"
-                fi
-            fi
-            
-            if [ -z "$API_BASE_URL" ]; then
-                echo "❌ Could not determine valid API endpoint"
-                API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com"
-                echo "⚠️  Falling back to: $API_BASE_URL"
-            fi
+            # Use known working API endpoint
+            API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com"
+            echo "✅ Using region: eu-1"
             
             # Build API URL with time parameters
             API_URL="$API_BASE_URL/v1/meta/export/query"
@@ -204,7 +172,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="interval", description="Time interval relative to now to retrieve latest 100 records from (e.g., '15m' for last 15 minutes, '1h' for last hour)", required=False),
+                Arg(name="interval", description="Time interval relative to now to retrieve all data from (e.g., '15m' for last 15 minutes, '1h' for last hour)", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False)
             ],
