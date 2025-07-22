@@ -67,7 +67,7 @@ class CLITools:
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
             if [ -n "$filter_term" ]; then
-                echo "📝 OPAL pipeline: filter message ~ \"$filter_term\" | pick_col *"
+                echo "📝 OPAL pipeline: filter message ~ '$filter_term' | pick_col *"
                 QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                     --arg filter_term "$filter_term" \
                     --arg customer_id "$OBSERVE_CUSTOMER_ID" \
@@ -84,7 +84,7 @@ class CLITools:
                             datasetId: ("o::" + $customer_id + ":dataset:" + .)
                         })
                     end as $inputs |
-                    ("filter message ~ " + ($filter_term | @json) + " | pick_col *") as $pipeline |
+                    ("filter message ~ '" + $filter_term + "' | pick_col *") as $pipeline |
                     {
                         "query": {
                             "stages": [{
