@@ -198,7 +198,7 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now to retrieve all data from (e.g., '15m' for last 15 minutes, '1h' for last hour) - returns up to 10000 records", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Optional filter term to search in body field (e.g., 'error', 'warning')", required=False)
+                Arg(name="filter", description="Optional filter term to search in body field", required=False)
             ],
             image="alpine:latest"
         )
