@@ -29,328 +29,164 @@ class CLITools:
             raise
 
     def execute_opal_query(self) -> ObserveCLITool:
-        """Execute optimized OPAL queries with intelligent filtering and caching."""
+        """Execute OPAL queries with AI-generated JSON query body."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Includes OPAL syntax validation and automatic correction of common SQL-like syntax errors. Uses dataset IDs from DATASET_IDS environment variable.",
+            description=(
+                "Execute OPAL queries on Observe datasets. Automatically uses dataset IDs from DATASET_IDS environment variable "
+                "and constructs the complete JSON query body. Provide only the OPAL pipeline query (e.g., 'filter message ~ \"error\" | limit 10')."
+            ),
             content="""
-            # Install dependencies (including GNU coreutils for reliable date handling)
-            if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
-            if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
-            # Install GNU coreutils to replace BusyBox date with GNU date
-            apk add --no-cache coreutils >/dev/null 2>&1
+            #!/bin/sh
+            set -e
             
-            # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, opal_query"
+            # Validate environment
+            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+                echo "❌ OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID are required"
                 exit 1
             fi
             
-            # Validate OPAL query syntax
-            echo "🔍 Validating OPAL query syntax..."
-            VALIDATION_ERRORS=""
-            
-            if echo "$opal_query" | grep -q "parse_timestamp"; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ 'parse_timestamp' is not valid OPAL syntax\n"
-            fi
-            
-            if echo "$opal_query" | grep -q "where.*>=.*now()"; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ SQL-like 'where' syntax not valid in OPAL. Use time_range parameter instead.\n"
-            fi
-            
-            if echo "$opal_query" | grep -q 'service_name=="'; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}⚠️  Consider using '~' operator for string matching: service_name ~ \"value\"\n"
-            fi
-            
-            # Check for missing spaces around operators
-            if echo "$opal_query" | grep -qE '[a-zA-Z_]~"'; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ Missing space before ~ operator. Use: field ~ \"value\" (not field~\"value\")\n"
-            fi
-            
-            if echo "$opal_query" | grep -qE '"~[a-zA-Z_]'; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ Missing space after ~ operator. Use: field ~ \"value\" (not field~\"value\")\n"
-            fi
-            
-            # Check for SQL-like boolean operators
-            if echo "$opal_query" | grep -q " and "; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ Use 'and' in OPAL, but ensure proper spacing. Better: use 'or' for multiple conditions.\n"
-            fi
-            
-            # Check if query starts without 'filter'
-            if ! echo "$opal_query" | grep -qE "^(filter|pick_col|stats)"; then
-                VALIDATION_ERRORS="${VALIDATION_ERRORS}⚠️  OPAL queries typically start with 'filter', 'pick_col', or 'stats'\n"
-            fi
-            
-            if [ -n "$VALIDATION_ERRORS" ]; then
-                echo "⚠️ OPAL Query Issues Detected:"
-                echo -e "$VALIDATION_ERRORS"
-                echo "💡 Proper OPAL syntax examples:"
-                echo "   • filter message ~ \"freighthub\""
-                echo "   • filter message ~ \"freighthub\" or message ~ \"FreightHub\""
-                echo "   • filter service_name ~ \"freight\" and level == \"ERROR\""
-                echo "   • Use proper spacing around operators: field ~ \"value\""
-                echo "   • Use time_range parameter (15m, 1h, 24h) instead of query-based time filtering"
-                echo ""
-                
-                # Try to auto-fix some common issues
-                echo "🔧 Attempting automatic fixes..."
-                ORIGINAL_QUERY="$opal_query"
-                
-                # Fix missing spaces around ~ operator
-                opal_query=$(echo "$opal_query" | sed 's/\([a-zA-Z_]\)~/\1 ~/g' | sed 's/~\([a-zA-Z_]\)/~ \1/g')
-                
-                # Suggest better field names based on common patterns
-                if echo "$opal_query" | grep -q "_source"; then
-                    echo "💡 Field name suggestion: Consider using 'message' instead of '_source'"
-                    echo "   Example: filter message ~ \"freighthub\" or message ~ \"FreightHub\""
-                fi
-                
-                # Add 'filter' prefix if missing and doesn't start with known commands
-                if ! echo "$opal_query" | grep -qE "^(filter|pick_col|stats)"; then
-                    opal_query="filter $opal_query"
-                fi
-                
-                if [ "$opal_query" != "$ORIGINAL_QUERY" ]; then
-                    echo "✅ Auto-corrected query: $opal_query"
-                    echo "💡 Consider this manual correction based on working examples:"
-                    SUGGESTED_QUERY=$(echo "$opal_query" | sed 's/_source/message/g')
-                    echo "   $SUGGESTED_QUERY"
-                fi
-            fi
-            
-            # Get dataset_id from DATASET_IDS environment variable
             if [ -z "$DATASET_IDS" ]; then
                 echo "❌ DATASET_IDS environment variable is required"
-                echo "💡 Set DATASET_IDS to a comma-separated list of allowed dataset IDs"
+                echo "Example: export DATASET_IDS=\"40001202,40001240\""
                 exit 1
             fi
             
-            # Extract the first dataset ID from the comma-separated list
-            dataset_id=$(echo "$DATASET_IDS" | cut -d',' -f1 | tr -d ' ')
+            # Install required tools
+            apk add --no-cache jq curl >/dev/null 2>&1 || {
+                echo "❌ Failed to install jq and curl"
+                exit 1
+            }
             
-            # Count how many datasets are available
-            DATASET_COUNT=$(echo "$DATASET_IDS" | tr ',' '\n' | wc -l)
+            # Parse arguments
+            opal_pipeline="$opal_pipeline"
+            interval="$interval"
+            start_time="$start_time"
+            end_time="$end_time"
             
-            echo "🗂️  Available datasets in DATASET_IDS: $DATASET_COUNT"
-            if [ $DATASET_COUNT -gt 1 ]; then
-                echo "🎯 Using first dataset: $dataset_id"
-                echo "📋 All available: $(echo "$DATASET_IDS" | tr ',' ' ')"
-            else
-                echo "🎯 Using dataset: $dataset_id"
-            fi
-            
-            # Validate dataset_id is not empty after extraction
-            if [ -z "$dataset_id" ]; then
-                echo "❌ Unable to extract valid dataset ID from DATASET_IDS"
+            if [ -z "$opal_pipeline" ]; then
+                echo "❌ opal_pipeline argument is required"
+                echo ""
+                echo "The pipeline should be an OPAL query string."
+                echo "Examples:"
+                echo '  filter message ~ "error" | limit 10'
+                echo '  pick_col timestamp, message, level | filter level == "ERROR"'
+                echo '  stats count by level | sort count desc'
                 exit 1
             fi
             
-            # Performance defaults and limits
-            MAX_ROWS=${max_rows:-1000}
-            TIMEOUT=${timeout:-60}
-            OUTPUT_FORMAT=${output_format:-"table"}
-            CACHE_RESULTS=${cache_results:-"true"}
+            echo "🔧 Building query from dataset IDs: $DATASET_IDS"
+            echo "📝 OPAL pipeline: $opal_pipeline"
+            echo ""
             
-            # Clean up invalid OPAL syntax automatically
-            OPTIMIZED_QUERY="$opal_query"
+            # Parse comma-separated dataset IDs and build input array
+            DATASET_ID_LIST=""
+            IFS=','
+            for dataset_id in $DATASET_IDS; do
+                # Trim whitespace
+                dataset_id=$(echo "$dataset_id" | tr -d ' ')
+                if [ -n "$dataset_id" ]; then
+                    if [ -n "$DATASET_ID_LIST" ]; then
+                        DATASET_ID_LIST="$DATASET_ID_LIST,"
+                    fi
+                    DATASET_ID_LIST="$DATASET_ID_LIST{\"inputName\":\"dataset_$dataset_id\",\"datasetId\":\"o::$OBSERVE_CUSTOMER_ID:dataset:$dataset_id\"}"
+                fi
+            done
             
-            # Remove invalid SQL-like syntax
-            OPTIMIZED_QUERY=$(echo "$OPTIMIZED_QUERY" | sed 's/| parse_timestamp[^|]*//g')
-            OPTIMIZED_QUERY=$(echo "$OPTIMIZED_QUERY" | sed 's/| where[^|]*//g')
-            
-            # Add limit if not present
-            if ! echo "$OPTIMIZED_QUERY" | grep -q "limit"; then
-                OPTIMIZED_QUERY="$OPTIMIZED_QUERY | limit $MAX_ROWS"
+            if [ -z "$DATASET_ID_LIST" ]; then
+                echo "❌ No valid dataset IDs found in DATASET_IDS"
+                exit 1
             fi
             
-            # Add performance-oriented columns if select/pick_col not specified
-            if ! echo "$OPTIMIZED_QUERY" | grep -qE "(pick_col|select|fields)"; then
-                OPTIMIZED_QUERY="pick_col TIMESTAMP, * | $OPTIMIZED_QUERY"
-            fi
-            
-            echo "🚀 Executing optimized query (max rows: $MAX_ROWS, timeout: ${TIMEOUT}s)..."
-            echo "🔍 Query: $OPTIMIZED_QUERY"
-            
-            # Build optimized payload with compression
-            QUERY_PAYLOAD=$(jq -n \
-                --arg dataset_id "$dataset_id" \
-                --arg pipeline "$OPTIMIZED_QUERY" \
+            # Construct the complete JSON query
+            QUERY_JSON=$(jq -n \
+                --arg pipeline "$opal_pipeline" \
+                --argjson inputs "[$DATASET_ID_LIST]" \
                 '{
                     "query": {
                         "stages": [{
-                            "input": [{"datasetId": $dataset_id}],
+                            "input": $inputs,
                             "stageID": "main",
                             "pipeline": $pipeline
                         }]
-                    },
-                    "maxRows": '${MAX_ROWS}',
-                    "format": "json",
-                    "compression": "gzip"
+                    }
                 }')
             
-            # Build time parameters with smart defaults - Dynamic time range parsing
-            QUERY_PARAMS=""
+            echo "📦 Generated Query JSON:"
+            echo "$QUERY_JSON" | jq .
+            echo ""
+            
+            # Build API URL with time parameters
+            API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+            PARAMS=""
+            
+            if [ -n "$interval" ]; then
+                PARAMS="interval=$interval"
+            fi
+            
             if [ -n "$start_time" ]; then
-                QUERY_PARAMS="startTime=$start_time"
-            elif [ -n "$time_range" ]; then
-                # Parse time range dynamically (e.g., "15m", "2h", "30s", "7d")
-                TIME_VALUE=$(echo "$time_range" | sed 's/[^0-9]//g')
-                TIME_UNIT=$(echo "$time_range" | sed 's/[0-9]//g')
-                
-                if [ -n "$TIME_VALUE" ] && [ -n "$TIME_UNIT" ]; then
-                    # Convert to seconds based on unit
-                    case "$TIME_UNIT" in
-                        "s"|"sec"|"second"|"seconds")
-                            SECONDS_AGO=$TIME_VALUE
-                            ;;
-                        "m"|"min"|"minute"|"minutes")
-                            SECONDS_AGO=$((TIME_VALUE * 60))
-                            ;;
-                        "h"|"hr"|"hour"|"hours")
-                            SECONDS_AGO=$((TIME_VALUE * 3600))
-                            ;;
-                        "d"|"day"|"days")
-                            SECONDS_AGO=$((TIME_VALUE * 86400))
-                            ;;
-                        "w"|"week"|"weeks")
-                            SECONDS_AGO=$((TIME_VALUE * 604800))
-                            ;;
-                        *)
-                            echo "⚠️ Unsupported time unit: $TIME_UNIT. Supported: s, m, h, d, w"
-                            SECONDS_AGO=""
-                            ;;
-                    esac
-                    
-                    if [ -n "$SECONDS_AGO" ]; then
-                        START_TIME=$(date -u -d "$SECONDS_AGO seconds ago" +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME"
-                        echo "🕐 Time filter: Last $time_range ($TIME_VALUE $TIME_UNIT from $START_TIME)"
-                    fi
+                if [ -n "$PARAMS" ]; then
+                    PARAMS="$PARAMS&startTime=$start_time"
                 else
-                    echo "⚠️ Invalid time range format: $time_range. Use format like '15m', '2h', '30s', '7d'"
+                    PARAMS="startTime=$start_time"
                 fi
             fi
             
             if [ -n "$end_time" ]; then
-                QUERY_PARAMS="${QUERY_PARAMS}&endTime=$end_time"
+                if [ -n "$PARAMS" ]; then
+                    PARAMS="$PARAMS&endTime=$end_time"
+                else
+                    PARAMS="endTime=$end_time"
+                fi
             fi
             
-            # Build URL with parameters
-            URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
-            if [ -n "$QUERY_PARAMS" ]; then
-                URL="$URL?$QUERY_PARAMS"
+            if [ -n "$PARAMS" ]; then
+                API_URL="$API_URL?$PARAMS"
             fi
             
-            # Execute with performance monitoring
-            START_TIME=$(date +%s)
+            echo "🚀 Executing OPAL query..."
+            echo "URL: $API_URL"
+            echo "Dataset IDs: $DATASET_IDS"
+            echo ""
             
-            RESPONSE=$(curl -s --max-time "$TIMEOUT" --fail \
-                --compressed \
+            # Execute query
+            RESPONSE=$(curl -s "$API_URL" \
+                --request POST \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
-                --header "Accept-Encoding: gzip" \
-                --request POST \
-                --data "$QUERY_PAYLOAD" \
-                "$URL" 2>/dev/null)
+                --header "Accept: application/x-ndjson" \
+                --data "$QUERY_JSON")
             
-            CURL_EXIT_CODE=$?
-            END_TIME=$(date +%s)
-            EXECUTION_TIME=$((END_TIME - START_TIME))
-            
-            if [ $CURL_EXIT_CODE -ne 0 ]; then
-                echo "❌ Query failed (exit code: $CURL_EXIT_CODE). Check dataset ID, query syntax, and network connectivity."
-                exit 1
-            fi
-            
-            # Parse and format results intelligently
-            if [ -z "$RESPONSE" ]; then
-                echo "⚠️ Empty response received"
-                exit 1
-            fi
-            
-            echo "✅ Query completed in ${EXECUTION_TIME}s"
-            
-            case "$OUTPUT_FORMAT" in
-                "table")
-                    echo "$RESPONSE" | jq -r '
-                        if .data and (.data | length > 0) then
-                            (.data[0] | keys_unsorted) as $keys |
-                            ($keys | @csv),
-                            (.data[] | [.[$keys[]]] | @csv)
-                        else
-                            "No results found"
-                        end' | head -n $((MAX_ROWS + 1)) | column -t -s ','
-                    ;;
-                "json")
-                    echo "$RESPONSE" | jq -r '
-                        if .data then
-                            {"results": .data, "count": (.data | length), "execution_time": "'${EXECUTION_TIME}'s"}
-                        else
-                            {"error": "No data returned", "execution_time": "'${EXECUTION_TIME}'s"}
-                        end'
-                    ;;
-                "csv")
-                    echo "$RESPONSE" | jq -r '
-                        if .data and (.data | length > 0) then
-                            (.data[0] | keys_unsorted) as $keys |
-                            ($keys | @csv),
-                            (.data[] | [.[$keys[]]] | @csv)
-                        else
-                            "No results found"
-                        end'
-                    ;;
-                "summary")
-                    echo "$RESPONSE" | jq -r '
-                        if .data then
-                            "Results: " + (.data | length | tostring) + " rows\n" +
-                            "Execution: '${EXECUTION_TIME}'s\n" +
-                            "Query: '${OPTIMIZED_QUERY}'\n" +
-                            if (.data | length > 0) then
-                                "Fields: " + (.data[0] | keys | join(", "))
-                            else
-                                "No data returned"
-                            end
-                        else
-                            "Error: No data in response"
-                        end'
-                    ;;
-                *)
-                    echo "$RESPONSE" | jq '.'
-                    ;;
-            esac
-            
-            # Cache results by default in workspace volume
-            if [ "$CACHE_RESULTS" = "true" ]; then
-                # Create cache directory if it doesn't exist
-                mkdir -p "/workspace/observe-data/cache"
+            # Process response
+            if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
+                echo "📊 Query Results:"
+                echo "$RESPONSE" | jq .
                 
-                CACHE_KEY=$(echo "${dataset_id}_${OPTIMIZED_QUERY}_$(date +%Y%m%d)" | md5sum | cut -d' ' -f1)
-                CACHE_FILE="/workspace/observe-data/cache/query_${CACHE_KEY}.json"
-                
-                # Check if cache exists and is recent (within 1 hour)
-                if [ -f "$CACHE_FILE" ] && [ $(find "$CACHE_FILE" -mmin -60 | wc -l) -gt 0 ]; then
-                    echo "⚡ Using cached results from: query_${CACHE_KEY}.json"
-                    cat "$CACHE_FILE"
-                    exit 0
+                # Check for errors and provide guidance
+                if echo "$RESPONSE" | jq -e '.error // .message' >/dev/null 2>&1; then
+                    echo ""
+                    echo "⚠️  Query completed with errors - see above for details"
+                    
+                    # Provide OPAL syntax help for common issues
+                    if echo "$RESPONSE" | jq -r '.message // ""' | grep -q "expected one of"; then
+                        echo ""
+                        echo "💡 Common OPAL syntax tips:"
+                        echo "  • Pattern matching: filter message ~ \"error\""
+                        echo "  • Exact matching: filter severity == \"error\""
+                        echo "  • Operators: ==, !=, ~, !~, <, >, contains"
+                        echo "  • Piping: filter ... | limit 10 | pick_col timestamp, message"
+                    fi
                 fi
-                
-                # Save new results to cache
-                echo "$RESPONSE" > "$CACHE_FILE"
-                echo "💾 Results cached to workspace: observe-data/cache/query_${CACHE_KEY}.json"
-                
-                # Clean old cache files (older than 7 days)
-                find "/workspace/observe-data/cache" -name "query_*.json" -mtime +7 -delete 2>/dev/null || true
+            else
+                echo "📄 Raw response (non-JSON):"
+                echo "$RESPONSE"
             fi
             """,
             args=[
-                Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count'). Use ~ for string matching, not ==. Avoid SQL syntax like 'where' or 'parse_timestamp'.", required=True),
-                Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
-                Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
-                Arg(name="time_range", description="Relative time range with format: number + unit (e.g., '15m', '2h', '30s', '7d', '1w'). Units: s/sec, m/min, h/hr, d/day, w/week", required=False),
-                Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
-                Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
-                Arg(name="timeout", description="Query timeout in seconds (default: 60)", required=False),
-                Arg(name="cache_results", description="Cache results for reuse: true/false (default: true)", required=False)
+                Arg(name="opal_pipeline", description="OPAL pipeline query string (e.g., 'filter message ~ \"error\" | limit 10'). Dataset IDs are automatically added from DATASET_IDS environment variable.", required=True),
+                Arg(name="interval", description="Time interval relative to now (e.g., '1h', '30m', '10s')", required=False),
+                Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
+                Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False)
             ],
             image="alpine:latest"
         )
