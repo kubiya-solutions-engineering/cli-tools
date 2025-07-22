@@ -207,32 +207,15 @@ class CLITools:
             echo "Dataset IDs: $DATASET_IDS"
             echo ""
             
-            # Execute query with better error handling
+            # Execute query (simplified like the successful version)
             RESPONSE=$(curl -s "$API_URL" \
                 --request POST \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
                 --header "Accept: application/x-ndjson" \
-                --data "$QUERY_JSON" \
-                --max-time 120 \
-                --fail-with-body)
+                --data "$QUERY_JSON")
             
-            CURL_EXIT_CODE=$?
-            
-            if [ $CURL_EXIT_CODE -ne 0 ]; then
-                echo "❌ Query execution failed (curl exit code: $CURL_EXIT_CODE)"
-                echo "🔍 Response body:"
-                echo "$RESPONSE"
-                echo ""
-                echo "💡 Troubleshooting tips:"
-                echo "  • Check your OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID"
-                echo "  • Verify the dataset IDs exist and you have access"
-                echo "  • Try a simpler query first (e.g., 'limit 5')"
-                echo "  • Check the OPAL syntax"
-                exit 1
-            fi
-            
-            # Process response
+            # Process response (same as successful version)
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
                 echo "📊 Query Results:"
                 echo "$RESPONSE" | jq .
