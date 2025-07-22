@@ -67,8 +67,8 @@ class CLITools:
             fi
             
             # Install required tools
-            apk add --no-cache jq curl >/dev/null 2>&1 || {
-                echo "❌ Failed to install jq and curl"
+            apk add --no-cache jq curl bc >/dev/null 2>&1 || {
+                echo "❌ Failed to install jq, curl, and bc"
                 exit 1
             }
             
@@ -235,21 +235,23 @@ class CLITools:
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
                 echo "📊 Query Results (completed in ${QUERY_DURATION}s):"
                 
-                # Calculate and display response size info
-                RESPONSE_SIZE=$(echo "$RESPONSE" | wc -c)
-                RECORD_COUNT=$(echo "$RESPONSE" | jq -r '.data | length // 0')
+                # Calculate and display response size info with error handling
+                RESPONSE_SIZE=$(echo "$RESPONSE" | wc -c 2>/dev/null || echo "0")
+                RECORD_COUNT=$(echo "$RESPONSE" | jq -r '.data | length // 0' 2>/dev/null || echo "0")
                 
-                if [ "$RECORD_COUNT" -gt 0 ] && [ "$RESPONSE_SIZE" -gt 0 ]; then
-                    AVG_RECORD_SIZE=$((RESPONSE_SIZE / RECORD_COUNT))
-                    echo "📏 Response: $RECORD_COUNT records, $RESPONSE_SIZE bytes (~${AVG_RECORD_SIZE} bytes/record)"
+                # Simple validation and display without complex arithmetic
+                if [ -n "$RECORD_COUNT" ] && [ "$RECORD_COUNT" != "null" ] && [ "$RECORD_COUNT" -gt 0 ] 2>/dev/null; then
+                    echo "📏 Response: $RECORD_COUNT records, $RESPONSE_SIZE bytes"
                     
-                    # Performance insights 
-                    if [ "$AVG_RECORD_SIZE" -gt 20000 ]; then
-                        echo "📊 Large records detected - rich log content available for analysis"
-                        if [ "$RECORD_COUNT" -gt 10 ]; then
+                    # Simple performance insights without division
+                    if [ "$RESPONSE_SIZE" -gt 500000 ] 2>/dev/null; then
+                        echo "📊 Large response detected - rich log content available for analysis"
+                        if [ "$RECORD_COUNT" -gt 10 ] 2>/dev/null; then
                             echo "💡 Consider using smaller --limit for faster initial analysis"
                         fi
                     fi
+                else
+                    echo "📏 Response received successfully"
                 fi
                 
                 echo "$RESPONSE" | jq .
