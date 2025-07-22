@@ -33,7 +33,7 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Returns all data from the specified time interval (up to 10000 records). "
+                "Execute OPAL queries on Observe datasets. Returns all data from the specified time interval, optionally filtered by message content. "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
             ),
             content="""
@@ -62,12 +62,17 @@ class CLITools:
             interval="$interval"
             start_time="$start_time"
             end_time="$end_time"
+            filter_term="$filter"
             
-            # Hardcoded query that works reliably - gets all data from time interval
-            opal_pipeline="pick_col *"
+            # Build pipeline with optional filter
+            if [ -n "$filter_term" ]; then
+                opal_pipeline="filter message ~ \"$filter_term\" | pick_col *"
+            else
+                opal_pipeline="pick_col *"
+            fi
             
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            echo "📝 OPAL pipeline: $opal_pipeline (gets all data from time interval)"
+            echo "📝 OPAL pipeline: $opal_pipeline"
             echo ""
             
             # Parse dataset IDs and determine the input structure
@@ -172,9 +177,10 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="interval", description="Time interval relative to now to retrieve all data from (e.g., '15m' for last 15 minutes, '1h' for last hour)", required=False),
+                Arg(name="interval", description="Time interval relative to now to retrieve all data from (e.g., '15m' for last 15 minutes, '1h' for last hour) - returns up to 10000 records", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
-                Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False)
+                Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
+                Arg(name="filter", description="Optional filter term to search in message field (e.g., 'error', 'freighthub', 'warning')", required=False)
             ],
             image="alpine:latest"
         )
