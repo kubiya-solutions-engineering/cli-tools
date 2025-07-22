@@ -173,7 +173,7 @@ class CLITools:
         """Execute optimized OPAL queries with intelligent filtering and caching."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Includes query optimization and performance monitoring.",
+            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Uses DATASET_ID environment variable for dataset selection.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -181,9 +181,52 @@ class CLITools:
             if ! command -v date >/dev/null 2>&1; then apk add --no-cache coreutils; fi
             
             # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$dataset_id" ] || [ -z "$opal_query" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, dataset_id, opal_query"
+            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
+                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, opal_query"
                 exit 1
+            fi
+            
+            # Get dataset_id from environment variable
+            if [ -z "$DATASET_ID" ]; then
+                echo "❌ DATASET_ID environment variable is required"
+                if [ -n "$DATASET_IDS" ]; then
+                    echo "📋 Available datasets (set DATASET_ID to one of these):"
+                    ALLOWED_IDS=$(echo "$DATASET_IDS" | tr ',' ' ')
+                    for id in $ALLOWED_IDS; do
+                        echo "  • $id"
+                    done
+                fi
+                exit 1
+            fi
+            
+            dataset_id="$DATASET_ID"
+            
+            # Validate dataset_id against DATASET_IDS if set
+            if [ -n "$DATASET_IDS" ]; then
+                echo "🔒 Validating dataset access..."
+                
+                # Convert comma-separated list to array for validation
+                ALLOWED_IDS=$(echo "$DATASET_IDS" | tr ',' ' ')
+                DATASET_FOUND=false
+                
+                # Check if provided dataset_id is in allowed list
+                for allowed_id in $ALLOWED_IDS; do
+                    if [ "$dataset_id" = "$allowed_id" ]; then
+                        DATASET_FOUND=true
+                        break
+                    fi
+                done
+                
+                if [ "$DATASET_FOUND" = "false" ]; then
+                    echo "❌ Dataset ID '$dataset_id' is not in the allowed list"
+                    echo "📋 Available datasets:"
+                    for id in $ALLOWED_IDS; do
+                        echo "  • $id"
+                    done
+                    exit 1
+                fi
+                
+                echo "✅ Dataset ID '$dataset_id' validated"
             fi
             
             # Performance defaults and limits
@@ -204,6 +247,7 @@ class CLITools:
             fi
             
             echo "🚀 Executing optimized query (max rows: $MAX_ROWS, timeout: ${TIMEOUT}s)..."
+            echo "🎯 Dataset: $dataset_id"
             echo "🔍 Query: $OPTIMIZED_QUERY"
             
             # Build optimized payload with compression
@@ -354,7 +398,6 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID to query (e.g., 41000001)", required=True),
                 Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count')", required=True),
                 Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
