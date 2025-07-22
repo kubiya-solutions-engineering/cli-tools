@@ -97,12 +97,25 @@ class CLITools:
                 exit 1
             fi
             
+            # Validate response before parsing
+            if [ -z "$RESPONSE" ]; then
+                echo "❌ Empty response received from API"
+                exit 1
+            fi
+            
+            # Check if response is valid JSON
+            if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                echo "❌ Invalid JSON response from API"
+                echo "Raw response: $RESPONSE"
+                exit 1
+            fi
+            
             # Parse and format response based on format
             if [ "$FORMAT" = "table" ]; then
                 echo "$RESPONSE" | jq -r '
                     if .data then
                         (["ID", "NAME", "TYPE", "STATUS", "RECORDS"] | @csv),
-                        (.data[] | [.id, .name, .kind, .status, (.recordCount // "N/A")] | @csv)
+                        (.data[] | [(.meta.id | split(":") | last), .config.name, .state.kind, .state.status, (.state.recordCount // "N/A")] | @csv)
                     else
                         "No datasets found or invalid response"
                     end' | column -t -s ','
@@ -111,7 +124,7 @@ class CLITools:
             elif [ "$FORMAT" = "compact" ]; then
                 echo "$RESPONSE" | jq -r '
                     if .data then
-                        .data[] | "\(.id): \(.name) (\(.kind))"
+                        .data[] | "\(.meta.id | split(":") | last): \(.config.name) (\(.state.kind))"
                     else
                         "No datasets found"
                     end'
@@ -119,7 +132,7 @@ class CLITools:
                 echo "$RESPONSE" | jq -r '
                     if .data then
                         "Found \(.data | length) datasets:\n" +
-                        (.data[] | "• \(.name) [\(.id)] - \(.kind) - \(.recordCount // "unknown") records")
+                        (.data[] | "• \(.config.name) [\(.meta.id | split(":") | last)] - \(.state.kind) - \(.state.recordCount // "unknown") records")
                     else
                         "No datasets found"
                     end'
