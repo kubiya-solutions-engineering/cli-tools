@@ -33,7 +33,7 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Returns up to 250 recent records from the specified time interval, optionally filtered across all fields. "
+                "Execute OPAL queries on Observe datasets. Returns up to 250 recent records from the specified time interval, optionally filtered by content in any field. "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
             ),
             content="""
@@ -63,11 +63,17 @@ class CLITools:
             start_time="$start_time"
             end_time="$end_time"
             filter_term="$filter"
+            filter_type="$filter_type"
+            
+            # Default filter type to body if not specified
+            if [ -z "$filter_type" ]; then
+                filter_type="body"
+            fi
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
             if [ -n "$filter_term" ]; then
-                pipeline_str=$(printf 'filter * ~ "%s" | limit 250' "$filter_term")
+                pipeline_str=$(printf 'filter %s ~ "%s" | limit 250' "$filter_type" "$filter_term")
                 echo "📝 OPAL pipeline: $pipeline_str"
                 QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                     --arg filter_pipeline "$pipeline_str" \
@@ -198,7 +204,8 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now (e.g., '5m', '15m', '30m', '1h')", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Optional filter term to search across all fields (case-insensitive).", required=False)
+                Arg(name="filter", description="Optional filter term to search for (case-insensitive). Searches in the field specified by filter_type (defaults to 'body'). Examples: 'error', 'freighthub', 'exception'", required=False),
+                Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, body, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'body' (log content).", required=False)
             ],
             image="alpine:latest"
         )
