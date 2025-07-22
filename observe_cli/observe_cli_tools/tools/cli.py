@@ -79,38 +79,37 @@ class CLITools:
             echo "📝 OPAL pipeline: $opal_pipeline"
             echo ""
             
-            # Parse comma-separated dataset IDs and build input array
-            DATASET_ID_LIST=""
-            IFS=','
-            for dataset_id in $DATASET_IDS; do
-                # Trim whitespace
-                dataset_id=$(echo "$dataset_id" | tr -d ' ')
-                if [ -n "$dataset_id" ]; then
-                    if [ -n "$DATASET_ID_LIST" ]; then
-                        DATASET_ID_LIST="$DATASET_ID_LIST,"
-                    fi
-                    DATASET_ID_LIST="$DATASET_ID_LIST{\"inputName\":\"dataset_$dataset_id\",\"datasetId\":\"o::$OBSERVE_CUSTOMER_ID:dataset:$dataset_id\"}"
-                fi
-            done
-            
-            if [ -z "$DATASET_ID_LIST" ]; then
-                echo "❌ No valid dataset IDs found in DATASET_IDS"
-                exit 1
-            fi
-            
-            # Construct the complete JSON query
-            QUERY_JSON=$(jq -n \
+            # Use jq to properly construct the input array from dataset IDs
+            QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                 --arg pipeline "$opal_pipeline" \
-                --argjson inputs "[$DATASET_ID_LIST]" \
-                '{
+                --arg customer_id "$OBSERVE_CUSTOMER_ID" \
+                'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
+                map({
+                    inputName: ("dataset_" + .),
+                    datasetId: ("o::" + $customer_id + ":dataset:" + .)
+                }) as $inputs |
+                {
                     "query": {
                         "stages": [{
                             "input": $inputs,
-                            "stageID": "main",
+                            "stageID": "main", 
                             "pipeline": $pipeline
                         }]
                     }
                 }')
+            
+            # Validate that the query was constructed successfully
+            if [ -z "$QUERY_JSON" ] || ! echo "$QUERY_JSON" | jq empty 2>/dev/null; then
+                echo "❌ Failed to construct query JSON from DATASET_IDS: $DATASET_IDS"
+                exit 1
+            fi
+            
+            # Validate that we have at least one dataset input
+            INPUT_COUNT=$(echo "$QUERY_JSON" | jq -r '.query.stages[0].input | length')
+            if [ "$INPUT_COUNT" -eq 0 ]; then
+                echo "❌ No valid dataset IDs found in DATASET_IDS: $DATASET_IDS"
+                exit 1
+            fi
             
             echo "📦 Generated Query JSON:"
             echo "$QUERY_JSON" | jq .
