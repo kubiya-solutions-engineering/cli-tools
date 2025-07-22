@@ -33,8 +33,8 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Automatically uses dataset IDs from DATASET_IDS environment variable "
-                "and constructs the complete JSON query body. Provide only the OPAL pipeline query (e.g., 'filter message ~ \"error\" | limit 10')."
+                "Execute OPAL queries on Observe datasets. Gets ALL data from the specified time interval (e.g., all records from last 15m). "
+                "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
             ),
             content="""
             #!/bin/sh
@@ -59,24 +59,15 @@ class CLITools:
             }
             
             # Parse arguments
-            opal_pipeline="$opal_pipeline"
             interval="$interval"
             start_time="$start_time"
             end_time="$end_time"
             
-            if [ -z "$opal_pipeline" ]; then
-                echo "❌ opal_pipeline argument is required"
-                echo ""
-                echo "The pipeline should be an OPAL query string."
-                echo "Examples:"
-                echo '  filter message ~ "error" | limit 10'
-                echo '  pick_col timestamp, message, level | filter level == "ERROR"'
-                echo '  stats count by level | sort count desc'
-                exit 1
-            fi
+            # Hardcoded query that works reliably
+            opal_pipeline="pick_col *"
             
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            echo "📝 OPAL pipeline: $opal_pipeline"
+            echo "📝 OPAL pipeline: $opal_pipeline (gets all data from specified time interval)"
             echo "🆔 Customer ID: $OBSERVE_CUSTOMER_ID"
             echo ""
             
@@ -224,16 +215,6 @@ class CLITools:
                 if echo "$RESPONSE" | jq -e '.error // .message' >/dev/null 2>&1; then
                     echo ""
                     echo "⚠️  Query completed with errors - see above for details"
-                    
-                    # Provide OPAL syntax help for common issues
-                    if echo "$RESPONSE" | jq -r '.message // ""' | grep -q "expected one of"; then
-                        echo ""
-                        echo "💡 Common OPAL syntax tips:"
-                        echo "  • Pattern matching: filter message ~ \"error\""
-                        echo "  • Exact matching: filter severity == \"error\""
-                        echo "  • Operators: ==, !=, ~, !~, <, >, contains"
-                        echo "  • Piping: filter ... | limit 10 | pick_col timestamp, message"
-                    fi
                 fi
             else
                 echo "📄 Raw response (non-JSON):"
@@ -241,8 +222,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="opal_pipeline", description="OPAL pipeline query string (e.g., 'filter message ~ \"error\" | limit 10'). Dataset IDs are automatically added from DATASET_IDS environment variable.", required=True),
-                Arg(name="interval", description="Time interval relative to now (e.g., '1h', '30m', '10s')", required=False),
+                Arg(name="interval", description="Time interval relative to now to retrieve ALL data from (e.g., '1h' for all data from last hour, '30m' for last 30 minutes, '15m' for last 15 minutes)", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False)
             ],
