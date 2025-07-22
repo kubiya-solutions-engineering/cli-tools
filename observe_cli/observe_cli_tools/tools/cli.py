@@ -72,29 +72,43 @@ class CLITools:
             
             # Check cache first
             mkdir -p "/workspace/observe-data/cache"
+            
+            # Clean old cache files (older than 2 hours)
+            find "/workspace/observe-data/cache" -name "datasets_*.json" -type f -mmin +120 -delete 2>/dev/null || true
+            
             CACHE_KEY=$(echo "datasets_${LIMIT}_${OFFSET}_${name_filter}_${type_filter}_$(date +%Y%m%d%H)" | md5sum | cut -d' ' -f1)
             CACHE_FILE="/workspace/observe-data/cache/datasets_${CACHE_KEY}.json"
             
-            if [ -f "$CACHE_FILE" ] && [ $(find "$CACHE_FILE" -mmin -30 | wc -l) -gt 0 ]; then
-                echo "⚡ Using cached dataset list from: datasets_${CACHE_KEY}.json"
-                RESPONSE=$(cat "$CACHE_FILE")
-            else
-                # Execute API call with timeout and error handling
+            # Check if cache file exists and is less than 30 minutes old
+            CACHE_USED=false
+            if [ -f "$CACHE_FILE" ]; then
+                # Check if file is less than 30 minutes old (1800 seconds)
+                FILE_AGE=$(( $(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0) ))
+                if [ "$FILE_AGE" -lt 1800 ]; then
+                    echo "⚡ Using cached dataset list (cached $(($FILE_AGE/60)) minutes ago)"
+                    RESPONSE=$(cat "$CACHE_FILE")
+                    CACHE_USED=true
+                fi
+            fi
+            
+            # Make API call only if cache wasn't used
+            if [ "$CACHE_USED" = "false" ]; then
+                echo "🌐 Making API call..."
                 RESPONSE=$(curl -s --max-time 30 --fail \
                     "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?$QUERY_PARAMS" \
                     --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                     --header "Content-Type: application/json" 2>/dev/null)
                 
-                # Cache the response
-                if [ $? -eq 0 ] && [ -n "$RESPONSE" ]; then
+                CURL_EXIT_CODE=$?
+                
+                # Cache the response if successful
+                if [ $CURL_EXIT_CODE -eq 0 ] && [ -n "$RESPONSE" ]; then
                     echo "$RESPONSE" > "$CACHE_FILE"
                     echo "💾 Dataset list cached to workspace: observe-data/cache/datasets_${CACHE_KEY}.json"
+                else
+                    echo "❌ API request failed. Check credentials and network connectivity."
+                    exit 1
                 fi
-            fi
-            
-            if [ $? -ne 0 ]; then
-                echo "❌ API request failed. Check credentials and network connectivity."
-                exit 1
             fi
             
             # Validate response before parsing
