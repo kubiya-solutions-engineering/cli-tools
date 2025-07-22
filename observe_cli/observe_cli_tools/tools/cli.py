@@ -64,46 +64,64 @@ class CLITools:
             end_time="$end_time"
             filter_term="$filter"
             
-            # Build pipeline with optional filter
-            if [ -n "$filter_term" ]; then
-                opal_pipeline="filter message ~ \"$filter_term\" | pick_col *"
-            else
-                opal_pipeline="pick_col *"
-            fi
-            
+            # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            echo "📝 OPAL pipeline: $opal_pipeline"
-            echo ""
-            
-            # Parse dataset IDs and determine the input structure
-            DATASET_COUNT=$(echo "$DATASET_IDS" | tr ',' '\n' | wc -l)
-            
-            # Use jq to properly construct the input array from dataset IDs
-            QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
-                --arg pipeline "$opal_pipeline" \
-                --arg customer_id "$OBSERVE_CUSTOMER_ID" \
-                'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
-                . as $dataset_ids | 
-                if length == 1 then
-                    [{
-                        inputName: "main",
-                        datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
-                    }]
-                else
-                    map({
-                        inputName: ("dataset_" + .),
-                        datasetId: ("o::" + $customer_id + ":dataset:" + .)
-                    })
-                end as $inputs |
-                {
-                    "query": {
-                        "stages": [{
-                            "input": $inputs,
-                            "stageID": "main", 
-                            "pipeline": $pipeline
+            if [ -n "$filter_term" ]; then
+                echo "📝 OPAL pipeline: filter message ~ \"$filter_term\" | pick_col *"
+                QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
+                    --arg filter_term "$filter_term" \
+                    --arg customer_id "$OBSERVE_CUSTOMER_ID" \
+                    'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
+                    . as $dataset_ids | 
+                    if length == 1 then
+                        [{
+                            inputName: "main",
+                            datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
                         }]
-                    }
-                }')
+                    else
+                        map({
+                            inputName: ("dataset_" + .),
+                            datasetId: ("o::" + $customer_id + ":dataset:" + .)
+                        })
+                    end as $inputs |
+                    ("filter message ~ \"" + $filter_term + "\" | pick_col *") as $pipeline |
+                    {
+                        "query": {
+                            "stages": [{
+                                "input": $inputs,
+                                "stageID": "main", 
+                                "pipeline": $pipeline
+                            }]
+                        }
+                    }')
+            else
+                echo "📝 OPAL pipeline: pick_col *"
+                QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
+                    --arg customer_id "$OBSERVE_CUSTOMER_ID" \
+                    'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
+                    . as $dataset_ids | 
+                    if length == 1 then
+                        [{
+                            inputName: "main",
+                            datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
+                        }]
+                    else
+                        map({
+                            inputName: ("dataset_" + .),
+                            datasetId: ("o::" + $customer_id + ":dataset:" + .)
+                        })
+                    end as $inputs |
+                    {
+                        "query": {
+                            "stages": [{
+                                "input": $inputs,
+                                "stageID": "main", 
+                                "pipeline": "pick_col *"
+                            }]
+                        }
+                    }')
+            fi
+            echo ""
             
             # Validate that the query was constructed successfully
             if [ -z "$QUERY_JSON" ] || ! echo "$QUERY_JSON" | jq empty 2>/dev/null; then
