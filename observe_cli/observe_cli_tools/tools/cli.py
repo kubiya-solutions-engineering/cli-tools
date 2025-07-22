@@ -53,7 +53,7 @@ class CLITools:
             fi
             
             # Build query parameters with defaults
-            LIMIT=${limit:-20}
+            LIMIT=${limit:-10}
             OFFSET=${offset:-0}
             FORMAT=${output_format:-"table"}
             QUERY_PARAMS="limit=$LIMIT&offset=$OFFSET"
@@ -115,15 +115,17 @@ class CLITools:
                 DATASET_COUNT=$(echo "$RESPONSE" | jq -r '.data | length // 0')
                 echo "📊 Found $DATASET_COUNT datasets:"
                 echo ""
+                echo "ID           | NAME                                           | TYPE"
+                echo "-------------|-----------------------------------------------|----------"
                 echo "$RESPONSE" | jq -r '
                     if .data then
-                        (["ID", "NAME", "TYPE"] | @csv),
-                        (.data[] | [(.meta.id | split(":") | last), .config.name, .state.kind] | @csv)
+                        .data[] | 
+                        (.meta.id | split(":") | last) + " | " + .config.name + " | " + .state.kind
                     else
-                        "No datasets found or invalid response"
-                    end' | column -t -s ','
+                        "No datasets found"
+                    end'
                 echo ""
-                echo "💡 Tip: Use --limit to see more datasets (e.g., --limit 100) or --name_filter to search for specific datasets"
+                echo "💡 Tip: Use --limit to see more datasets (e.g., --limit 50) or --name_filter to search for specific datasets"
             elif [ "$FORMAT" = "json" ]; then
                 echo "$RESPONSE" | jq '.' 2>/dev/null || echo "Error: Invalid JSON response"
             elif [ "$FORMAT" = "compact" ]; then
@@ -144,7 +146,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="limit", description="Maximum number of datasets to return (default: 20, max: 500)", required=False),
+                Arg(name="limit", description="Maximum number of datasets to return (default: 10, max: 500)", required=False),
                 Arg(name="offset", description="Number of datasets to skip for pagination (default: 0)", required=False),
                 Arg(name="name_filter", description="Filter datasets by name (partial match)", required=False),
                 Arg(name="type_filter", description="Filter by dataset type (e.g., 'logs', 'metrics', 'events')", required=False),
