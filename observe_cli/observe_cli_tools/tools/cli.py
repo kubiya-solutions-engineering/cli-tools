@@ -84,7 +84,7 @@ class CLITools:
                             datasetId: ("o::" + $customer_id + ":dataset:" + .)
                         })
                     end as $inputs |
-                    ("filter message ~ \"" + $filter_term + "\" | pick_col *") as $pipeline |
+                    ("filter message ~ " + ($filter_term | @json) + " | pick_col *") as $pipeline |
                     {
                         "query": {
                             "stages": [{
