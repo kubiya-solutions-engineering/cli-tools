@@ -32,7 +32,7 @@ class CLITools:
         """Execute optimized OPAL queries with intelligent filtering and caching."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Uses dataset IDs from DATASET_IDS environment variable.",
+            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Includes OPAL syntax validation and automatic correction of common SQL-like syntax errors. Uses dataset IDs from DATASET_IDS environment variable.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -43,6 +43,32 @@ class CLITools:
             if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
                 echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, opal_query"
                 exit 1
+            fi
+            
+            # Validate OPAL query syntax
+            echo "🔍 Validating OPAL query syntax..."
+            VALIDATION_ERRORS=""
+            
+            if echo "$opal_query" | grep -q "parse_timestamp"; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ 'parse_timestamp' is not valid OPAL syntax\n"
+            fi
+            
+            if echo "$opal_query" | grep -q "where.*>=.*now()"; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ SQL-like 'where' syntax not valid in OPAL. Use time_range parameter instead.\n"
+            fi
+            
+            if echo "$opal_query" | grep -q 'service_name=="'; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}⚠️  Consider using '~' operator for string matching: service_name ~ \"value\"\n"
+            fi
+            
+            if [ -n "$VALIDATION_ERRORS" ]; then
+                echo "⚠️ OPAL Query Issues Detected:"
+                echo -e "$VALIDATION_ERRORS"
+                echo "💡 Proper OPAL syntax examples:"
+                echo "   • filter message ~ \"freighthub\""
+                echo "   • filter service_name ~ \"freight\" and level == \"ERROR\""
+                echo "   • Use time_range parameter (15m, 1h, 24h) instead of query-based time filtering"
+                echo ""
             fi
             
             # Get dataset_id from DATASET_IDS environment variable
@@ -78,8 +104,14 @@ class CLITools:
             OUTPUT_FORMAT=${output_format:-"table"}
             CACHE_RESULTS=${cache_results:-"true"}
             
-            # Smart query optimization - automatically add limits if not present
+            # Clean up invalid OPAL syntax automatically
             OPTIMIZED_QUERY="$opal_query"
+            
+            # Remove invalid SQL-like syntax
+            OPTIMIZED_QUERY=$(echo "$OPTIMIZED_QUERY" | sed 's/| parse_timestamp[^|]*//g')
+            OPTIMIZED_QUERY=$(echo "$OPTIMIZED_QUERY" | sed 's/| where[^|]*//g')
+            
+            # Add limit if not present
             if ! echo "$OPTIMIZED_QUERY" | grep -q "limit"; then
                 OPTIMIZED_QUERY="$OPTIMIZED_QUERY | limit $MAX_ROWS"
             fi
@@ -109,13 +141,22 @@ class CLITools:
                     "compression": "gzip"
                 }')
             
-            # Build time parameters with smart defaults
+            # Build time parameters with smart defaults - FIXED to include minutes
             QUERY_PARAMS=""
             if [ -n "$start_time" ]; then
                 QUERY_PARAMS="startTime=$start_time"
             elif [ -n "$time_range" ]; then
-                # Convert relative time to absolute timestamps
+                # Convert relative time to absolute timestamps - EXPANDED to include minutes
                 case "$time_range" in
+                    "5m"|"5min")
+                        START_TIME=$(date -d "5 minutes ago" -u +"%Y-%m-%dT%H:%M:%SZ")
+                        QUERY_PARAMS="startTime=$START_TIME" ;;
+                    "15m"|"15min")
+                        START_TIME=$(date -d "15 minutes ago" -u +"%Y-%m-%dT%H:%M:%SZ")
+                        QUERY_PARAMS="startTime=$START_TIME" ;;
+                    "30m"|"30min")
+                        START_TIME=$(date -d "30 minutes ago" -u +"%Y-%m-%dT%H:%M:%SZ")
+                        QUERY_PARAMS="startTime=$START_TIME" ;;
                     "1h"|"hour") 
                         START_TIME=$(date -d "1 hour ago" -u +"%Y-%m-%dT%H:%M:%SZ")
                         QUERY_PARAMS="startTime=$START_TIME" ;;
@@ -125,6 +166,9 @@ class CLITools:
                     "7d"|"week")
                         START_TIME=$(date -d "1 week ago" -u +"%Y-%m-%dT%H:%M:%SZ")
                         QUERY_PARAMS="startTime=$START_TIME" ;;
+                    *)
+                        echo "⚠️ Unsupported time_range: $time_range. Supported: 5m, 15m, 30m, 1h, 24h, 7d"
+                        ;;
                 esac
             fi
             
@@ -240,12 +284,12 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count')", required=True),
+                Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count'). Use ~ for string matching, not ==. Avoid SQL syntax like 'where' or 'parse_timestamp'.", required=True),
                 Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
-                Arg(name="time_range", description="Relative time range: 1h, 24h, 7d (alternative to start_time)", required=False),
+                Arg(name="time_range", description="Relative time range: 5m, 15m, 30m, 1h, 24h, 7d (alternative to start_time)", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
-                Arg(name="end_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
+                Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="timeout", description="Query timeout in seconds (default: 60)", required=False),
                 Arg(name="cache_results", description="Cache results for reuse: true/false (default: true)", required=False)
             ],
