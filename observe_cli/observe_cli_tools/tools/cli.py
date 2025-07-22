@@ -10,7 +10,6 @@ class CLITools:
         """Initialize and register Observe API tools."""
         try:
             tools = [
-                self.list_datasets(),
                 self.execute_opal_query(),
                 self.query_builder(),
                 self.dataset_analyzer(),
@@ -29,151 +28,11 @@ class CLITools:
             print(f"❌ Failed to register Observe API wrapper tools: {str(e)}", file=sys.stderr)
             raise
 
-    def list_datasets(self) -> ObserveCLITool:
-        """List datasets with advanced filtering and pagination support."""
-        return ObserveCLITool(
-            name="observe_list_datasets",
-            description="List datasets with filtering, search, and pagination. Supports name filtering, type filtering, and result limiting for efficient data retrieval. Shows essential dataset information (ID, Name, Type).",
-            content="""
-            # Install required tools
-            if ! command -v curl >/dev/null 2>&1; then
-                apk add --no-cache curl >/dev/null 2>&1
-            fi
-            if ! command -v jq >/dev/null 2>&1; then
-                apk add --no-cache jq >/dev/null 2>&1
-            fi
-            if ! command -v column >/dev/null 2>&1; then
-                apk add --no-cache util-linux >/dev/null 2>&1
-            fi
-            
-            # Validate environment
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
-                echo "Error: OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID are required"
-                exit 1
-            fi
-            
-            # Build query parameters with defaults
-            LIMIT=${limit:-10}
-            OFFSET=${offset:-0}
-            FORMAT=${output_format:-"table"}
-            QUERY_PARAMS="limit=$LIMIT&offset=$OFFSET"
-            
-            # Add search filter if provided
-            if [ -n "$name_filter" ]; then
-                QUERY_PARAMS="${QUERY_PARAMS}&name=$name_filter"
-            fi
-            
-            # Add type filter if provided
-            if [ -n "$type_filter" ]; then
-                QUERY_PARAMS="${QUERY_PARAMS}&type=$type_filter"
-            fi
-            
-            echo "🔍 Fetching datasets (limit: $LIMIT, offset: $OFFSET)..."
-            
-            # Check cache first
-            mkdir -p "/workspace/observe-data/cache"
-            
-            # Clean old cache files (older than 2 hours)
-            find "/workspace/observe-data/cache" -name "datasets_*.json" -type f -mmin +120 -delete 2>/dev/null || true
-            
-            CACHE_KEY=$(echo "datasets_${LIMIT}_${OFFSET}_${name_filter}_${type_filter}_$(date +%Y%m%d%H)" | md5sum | cut -d' ' -f1)
-            CACHE_FILE="/workspace/observe-data/cache/datasets_${CACHE_KEY}.json"
-            
-            # Check if cache file exists and is less than 30 minutes old
-            CACHE_USED=false
-            if [ -f "$CACHE_FILE" ]; then
-                # Check if file is less than 30 minutes old (1800 seconds)
-                FILE_AGE=$(( $(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0) ))
-                if [ "$FILE_AGE" -lt 1800 ]; then
-                    echo "⚡ Using cached dataset list (cached $(($FILE_AGE/60)) minutes ago)"
-                    RESPONSE=$(cat "$CACHE_FILE")
-                    CACHE_USED=true
-                fi
-            fi
-            
-            # Make API call only if cache wasn't used
-            if [ "$CACHE_USED" = "false" ]; then
-                echo "🌐 Making API call..."
-                RESPONSE=$(curl -s --max-time 30 --fail \
-                    "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?$QUERY_PARAMS" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                    --header "Content-Type: application/json" 2>/dev/null)
-                
-                CURL_EXIT_CODE=$?
-                
-                # Cache the response if successful
-                if [ $CURL_EXIT_CODE -eq 0 ] && [ -n "$RESPONSE" ]; then
-                    echo "$RESPONSE" > "$CACHE_FILE"
-                    echo "💾 Dataset list cached to workspace: observe-data/cache/datasets_${CACHE_KEY}.json"
-                else
-                    echo "❌ API request failed. Check credentials and network connectivity."
-                    exit 1
-                fi
-            fi
-            
-            # Validate response before parsing
-            if [ -z "$RESPONSE" ]; then
-                echo "❌ Empty response received from API"
-                exit 1
-            fi
-            
-            # Check if response is valid JSON
-            if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
-                echo "❌ Invalid JSON response from API"
-                echo "Raw response: $RESPONSE"
-                exit 1
-            fi
-            
-            # Parse and format response based on format
-            if [ "$FORMAT" = "table" ]; then
-                DATASET_COUNT=$(echo "$RESPONSE" | jq -r '.data | length // 0')
-                echo "📊 Found $DATASET_COUNT datasets:"
-                echo ""
-                echo "ID           | NAME                                           | TYPE"
-                echo "-------------|-----------------------------------------------|----------"
-                echo "$RESPONSE" | jq -r '
-                    if .data then
-                        .data[] | 
-                        (.meta.id | split(":") | last) + " | " + .config.name + " | " + .state.kind
-                    else
-                        "No datasets found"
-                    end'
-                echo ""
-                echo "💡 Tip: Use --limit to see more datasets (e.g., --limit 50) or --name_filter to search for specific datasets"
-            elif [ "$FORMAT" = "json" ]; then
-                echo "$RESPONSE" | jq '.' 2>/dev/null || echo "Error: Invalid JSON response"
-            elif [ "$FORMAT" = "compact" ]; then
-                echo "$RESPONSE" | jq -r '
-                    if .data then
-                        .data[] | "\(.meta.id | split(":") | last): \(.config.name) (\(.state.kind))"
-                    else
-                        "No datasets found"
-                    end'
-            else
-                echo "$RESPONSE" | jq -r '
-                    if .data then
-                        "Found \(.data | length) datasets:\n" +
-                        (.data[] | "• \(.config.name) [\(.meta.id | split(":") | last)] - \(.state.kind)")
-                    else
-                        "No datasets found"
-                    end'
-            fi
-            """,
-            args=[
-                Arg(name="limit", description="Maximum number of datasets to return (default: 10, max: 500)", required=False),
-                Arg(name="offset", description="Number of datasets to skip for pagination (default: 0)", required=False),
-                Arg(name="name_filter", description="Filter datasets by name (partial match)", required=False),
-                Arg(name="type_filter", description="Filter by dataset type (e.g., 'logs', 'metrics', 'events')", required=False),
-                Arg(name="output_format", description="Output format: table, json, compact, summary (default: table)", required=False)
-            ],
-            image="alpine:latest"
-        )
-
     def execute_opal_query(self) -> ObserveCLITool:
         """Execute optimized OPAL queries with intelligent filtering and caching."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Uses DATASET_ID environment variable for dataset selection.",
+            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Uses dataset IDs from DATASET_IDS environment variable.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -186,47 +45,31 @@ class CLITools:
                 exit 1
             fi
             
-            # Get dataset_id from environment variable
-            if [ -z "$DATASET_ID" ]; then
-                echo "❌ DATASET_ID environment variable is required"
-                if [ -n "$DATASET_IDS" ]; then
-                    echo "📋 Available datasets (set DATASET_ID to one of these):"
-                    ALLOWED_IDS=$(echo "$DATASET_IDS" | tr ',' ' ')
-                    for id in $ALLOWED_IDS; do
-                        echo "  • $id"
-                    done
-                fi
+            # Get dataset_id from DATASET_IDS environment variable
+            if [ -z "$DATASET_IDS" ]; then
+                echo "❌ DATASET_IDS environment variable is required"
+                echo "💡 Set DATASET_IDS to a comma-separated list of allowed dataset IDs"
                 exit 1
             fi
             
-            dataset_id="$DATASET_ID"
+            # Extract the first dataset ID from the comma-separated list
+            dataset_id=$(echo "$DATASET_IDS" | cut -d',' -f1 | tr -d ' ')
             
-            # Validate dataset_id against DATASET_IDS if set
-            if [ -n "$DATASET_IDS" ]; then
-                echo "🔒 Validating dataset access..."
-                
-                # Convert comma-separated list to array for validation
-                ALLOWED_IDS=$(echo "$DATASET_IDS" | tr ',' ' ')
-                DATASET_FOUND=false
-                
-                # Check if provided dataset_id is in allowed list
-                for allowed_id in $ALLOWED_IDS; do
-                    if [ "$dataset_id" = "$allowed_id" ]; then
-                        DATASET_FOUND=true
-                        break
-                    fi
-                done
-                
-                if [ "$DATASET_FOUND" = "false" ]; then
-                    echo "❌ Dataset ID '$dataset_id' is not in the allowed list"
-                    echo "📋 Available datasets:"
-                    for id in $ALLOWED_IDS; do
-                        echo "  • $id"
-                    done
-                    exit 1
-                fi
-                
-                echo "✅ Dataset ID '$dataset_id' validated"
+            # Count how many datasets are available
+            DATASET_COUNT=$(echo "$DATASET_IDS" | tr ',' '\n' | wc -l)
+            
+            echo "🗂️  Available datasets in DATASET_IDS: $DATASET_COUNT"
+            if [ $DATASET_COUNT -gt 1 ]; then
+                echo "🎯 Using first dataset: $dataset_id"
+                echo "📋 All available: $(echo "$DATASET_IDS" | tr ',' ' ')"
+            else
+                echo "🎯 Using dataset: $dataset_id"
+            fi
+            
+            # Validate dataset_id is not empty after extraction
+            if [ -z "$dataset_id" ]; then
+                echo "❌ Unable to extract valid dataset ID from DATASET_IDS"
+                exit 1
             fi
             
             # Performance defaults and limits
@@ -247,7 +90,6 @@ class CLITools:
             fi
             
             echo "🚀 Executing optimized query (max rows: $MAX_ROWS, timeout: ${TIMEOUT}s)..."
-            echo "🎯 Dataset: $dataset_id"
             echo "🔍 Query: $OPTIMIZED_QUERY"
             
             # Build optimized payload with compression
@@ -403,7 +245,7 @@ class CLITools:
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
                 Arg(name="time_range", description="Relative time range: 1h, 24h, 7d (alternative to start_time)", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
-                Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
+                Arg(name="end_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="timeout", description="Query timeout in seconds (default: 60)", required=False),
                 Arg(name="cache_results", description="Cache results for reuse: true/false (default: true)", required=False)
             ],
