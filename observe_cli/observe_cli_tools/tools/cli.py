@@ -34,10 +34,11 @@ class CLITools:
             name="observe_opal_query",
             description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Includes OPAL syntax validation and automatic correction of common SQL-like syntax errors. Uses dataset IDs from DATASET_IDS environment variable.",
             content="""
-            # Install dependencies
+            # Install dependencies (including GNU coreutils for reliable date handling)
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
             if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
-            if ! command -v date >/dev/null 2>&1; then apk add --no-cache coreutils; fi
+            # Install GNU coreutils to replace BusyBox date with GNU date
+            apk add --no-cache coreutils >/dev/null 2>&1
             
             # Validate inputs
             if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
@@ -141,35 +142,47 @@ class CLITools:
                     "compression": "gzip"
                 }')
             
-            # Build time parameters with smart defaults - FIXED to include minutes
+            # Build time parameters with smart defaults - Dynamic time range parsing
             QUERY_PARAMS=""
             if [ -n "$start_time" ]; then
                 QUERY_PARAMS="startTime=$start_time"
             elif [ -n "$time_range" ]; then
-                # Convert relative time to absolute timestamps - EXPANDED to include minutes
-                case "$time_range" in
-                    "5m"|"5min")
-                        START_TIME=$(date -d "5 minutes ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME" ;;
-                    "15m"|"15min")
-                        START_TIME=$(date -d "15 minutes ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME" ;;
-                    "30m"|"30min")
-                        START_TIME=$(date -d "30 minutes ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME" ;;
-                    "1h"|"hour") 
-                        START_TIME=$(date -d "1 hour ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME" ;;
-                    "24h"|"day")
-                        START_TIME=$(date -d "1 day ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME" ;;
-                    "7d"|"week")
-                        START_TIME=$(date -d "1 week ago" -u +"%Y-%m-%dT%H:%M:%SZ")
-                        QUERY_PARAMS="startTime=$START_TIME" ;;
-                    *)
-                        echo "⚠️ Unsupported time_range: $time_range. Supported: 5m, 15m, 30m, 1h, 24h, 7d"
-                        ;;
-                esac
+                # Parse time range dynamically (e.g., "15m", "2h", "30s", "7d")
+                TIME_VALUE=$(echo "$time_range" | sed 's/[^0-9]//g')
+                TIME_UNIT=$(echo "$time_range" | sed 's/[0-9]//g')
+                
+                if [ -n "$TIME_VALUE" ] && [ -n "$TIME_UNIT" ]; then
+                    # Convert to seconds based on unit
+                    case "$TIME_UNIT" in
+                        "s"|"sec"|"second"|"seconds")
+                            SECONDS_AGO=$TIME_VALUE
+                            ;;
+                        "m"|"min"|"minute"|"minutes")
+                            SECONDS_AGO=$((TIME_VALUE * 60))
+                            ;;
+                        "h"|"hr"|"hour"|"hours")
+                            SECONDS_AGO=$((TIME_VALUE * 3600))
+                            ;;
+                        "d"|"day"|"days")
+                            SECONDS_AGO=$((TIME_VALUE * 86400))
+                            ;;
+                        "w"|"week"|"weeks")
+                            SECONDS_AGO=$((TIME_VALUE * 604800))
+                            ;;
+                        *)
+                            echo "⚠️ Unsupported time unit: $TIME_UNIT. Supported: s, m, h, d, w"
+                            SECONDS_AGO=""
+                            ;;
+                    esac
+                    
+                    if [ -n "$SECONDS_AGO" ]; then
+                        START_TIME=$(date -u -d "$SECONDS_AGO seconds ago" +"%Y-%m-%dT%H:%M:%SZ")
+                        QUERY_PARAMS="startTime=$START_TIME"
+                        echo "🕐 Time filter: Last $time_range ($TIME_VALUE $TIME_UNIT from $START_TIME)"
+                    fi
+                else
+                    echo "⚠️ Invalid time range format: $time_range. Use format like '15m', '2h', '30s', '7d'"
+                fi
             fi
             
             if [ -n "$end_time" ]; then
@@ -287,7 +300,7 @@ class CLITools:
                 Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count'). Use ~ for string matching, not ==. Avoid SQL syntax like 'where' or 'parse_timestamp'.", required=True),
                 Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
-                Arg(name="time_range", description="Relative time range: 5m, 15m, 30m, 1h, 24h, 7d (alternative to start_time)", required=False),
+                Arg(name="time_range", description="Relative time range with format: number + unit (e.g., '15m', '2h', '30s', '7d', '1w'). Units: s/sec, m/min, h/hr, d/day, w/week", required=False),
                 Arg(name="start_time", description="Start time in ISO8601 format (e.g., 2023-04-20T16:20:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO8601 format (e.g., 2023-04-20T16:30:00Z)", required=False),
                 Arg(name="timeout", description="Query timeout in seconds (default: 60)", required=False),
