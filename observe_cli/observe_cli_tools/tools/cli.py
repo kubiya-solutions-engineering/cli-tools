@@ -318,7 +318,7 @@ class CLITools:
             """,
             args=[
                 Arg(name="dataset_id", description="Dataset ID to query (e.g., 41000001)", required=True),
-                Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level=="ERROR" | top 10 by count')", required=True),
+                Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count')", required=True),
                 Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
                 Arg(name="time_range", description="Relative time range: 1h, 24h, 7d (alternative to start_time)", required=False),
