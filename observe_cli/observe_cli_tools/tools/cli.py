@@ -33,17 +33,17 @@ class CLITools:
         """List datasets with advanced filtering and pagination support."""
         return ObserveCLITool(
             name="observe_list_datasets",
-            description="List datasets with filtering, search, and pagination. Supports name filtering, type filtering, and result limiting for efficient data retrieval.",
+            description="List datasets with filtering, search, and pagination. Supports name filtering, type filtering, and result limiting for efficient data retrieval. Shows essential dataset information (ID, Name, Type).",
             content="""
             # Install required tools
             if ! command -v curl >/dev/null 2>&1; then
-                apk add --no-cache curl
+                apk add --no-cache curl >/dev/null 2>&1
             fi
             if ! command -v jq >/dev/null 2>&1; then
-                apk add --no-cache jq
+                apk add --no-cache jq >/dev/null 2>&1
             fi
             if ! command -v column >/dev/null 2>&1; then
-                apk add --no-cache util-linux
+                apk add --no-cache util-linux >/dev/null 2>&1
             fi
             
             # Validate environment
@@ -53,7 +53,7 @@ class CLITools:
             fi
             
             # Build query parameters with defaults
-            LIMIT=${limit:-50}
+            LIMIT=${limit:-20}
             OFFSET=${offset:-0}
             FORMAT=${output_format:-"table"}
             QUERY_PARAMS="limit=$LIMIT&offset=$OFFSET"
@@ -112,13 +112,18 @@ class CLITools:
             
             # Parse and format response based on format
             if [ "$FORMAT" = "table" ]; then
+                DATASET_COUNT=$(echo "$RESPONSE" | jq -r '.data | length // 0')
+                echo "📊 Found $DATASET_COUNT datasets:"
+                echo ""
                 echo "$RESPONSE" | jq -r '
                     if .data then
-                        (["ID", "NAME", "TYPE", "STATUS", "RECORDS"] | @csv),
-                        (.data[] | [(.meta.id | split(":") | last), .config.name, .state.kind, .state.status, (.state.recordCount // "N/A")] | @csv)
+                        (["ID", "NAME", "TYPE"] | @csv),
+                        (.data[] | [(.meta.id | split(":") | last), .config.name, .state.kind] | @csv)
                     else
                         "No datasets found or invalid response"
                     end' | column -t -s ','
+                echo ""
+                echo "💡 Tip: Use --limit to see more datasets (e.g., --limit 100) or --name_filter to search for specific datasets"
             elif [ "$FORMAT" = "json" ]; then
                 echo "$RESPONSE" | jq '.' 2>/dev/null || echo "Error: Invalid JSON response"
             elif [ "$FORMAT" = "compact" ]; then
@@ -132,14 +137,14 @@ class CLITools:
                 echo "$RESPONSE" | jq -r '
                     if .data then
                         "Found \(.data | length) datasets:\n" +
-                        (.data[] | "• \(.config.name) [\(.meta.id | split(":") | last)] - \(.state.kind) - \(.state.recordCount // "unknown") records")
+                        (.data[] | "• \(.config.name) [\(.meta.id | split(":") | last)] - \(.state.kind)")
                     else
                         "No datasets found"
                     end'
             fi
             """,
             args=[
-                Arg(name="limit", description="Maximum number of datasets to return (default: 50, max: 500)", required=False),
+                Arg(name="limit", description="Maximum number of datasets to return (default: 20, max: 500)", required=False),
                 Arg(name="offset", description="Number of datasets to skip for pagination (default: 0)", required=False),
                 Arg(name="name_filter", description="Filter datasets by name (partial match)", required=False),
                 Arg(name="type_filter", description="Filter by dataset type (e.g., 'logs', 'metrics', 'events')", required=False),
