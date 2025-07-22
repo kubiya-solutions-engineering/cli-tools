@@ -29,11 +29,14 @@ class CLITools:
             raise
 
     def execute_opal_query(self) -> ObserveCLITool:
-        """Execute OPAL queries with AI-generated JSON query body."""
+        """Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, 
+        optionally filtered by content in any field. Supports field selection for performance optimization with large records. 
+        Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."""
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Returns up to 250 recent records from the specified time interval, optionally filtered by content in any field. "
+                "Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, "
+                "optionally filtered by content in any field. Supports field selection for performance optimization with large records. "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
             ),
             content="""
@@ -64,16 +67,34 @@ class CLITools:
             end_time="$end_time"
             filter_term="$filter"
             filter_type="$filter_type"
+            fields="$fields"
+            limit_count="$limit"
             
-            # Default filter type to body if not specified
+            # Default values for performance optimization
             if [ -z "$filter_type" ]; then
                 filter_type="body"
+            fi
+            
+            if [ -z "$limit_count" ]; then
+                limit_count="25"  # Reduced from 250 for performance with large records
+            fi
+            
+            # Build field selection part of pipeline
+            field_selection=""
+            if [ -n "$fields" ]; then
+                # User specified specific fields
+                field_selection="pick_col $fields | "
+                echo "📝 Field selection: $fields"
+            else
+                # Default behavior - include all fields but warn about potential size
+                echo "💡 Including all fields (including body with log content)"
+                echo "   Note: Some records can be 40k+ characters - using limit=$limit_count for performance"
             fi
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
             if [ -n "$filter_term" ]; then
-                pipeline_str=$(printf 'filter %s ~ "%s" | limit 250' "$filter_type" "$filter_term")
+                pipeline_str=$(printf '%sfilter %s ~ "%s" | limit %s' "$field_selection" "$filter_type" "$filter_term" "$limit_count")
                 echo "📝 OPAL pipeline: $pipeline_str"
                 QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                     --arg filter_pipeline "$pipeline_str" \
@@ -101,9 +122,11 @@ class CLITools:
                         }
                     }')
             else
-                echo "📝 OPAL pipeline: limit 250"
+                pipeline_str=$(printf '%slimit %s' "$field_selection" "$limit_count")
+                echo "📝 OPAL pipeline: $pipeline_str"
                 QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                     --arg customer_id "$OBSERVE_CUSTOMER_ID" \
+                    --arg pipeline "$pipeline_str" \
                     'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
                     . as $dataset_ids | 
                     if length == 1 then
@@ -122,12 +145,18 @@ class CLITools:
                             "stages": [{
                                 "input": $inputs,
                                 "stageID": "main", 
-                                "pipeline": "limit 250"
+                                "pipeline": $pipeline
                             }]
                         }
                     }')
             fi
             echo ""
+            
+            # Performance guidance
+            if [ "$limit_count" -gt 50 ]; then
+                echo "⚠️  High limit ($limit_count) may cause slow responses with large log records"
+                echo "💡 Consider starting with a smaller limit and increasing if needed"
+            fi
             
             # Validate that the query was constructed successfully
             if [ -z "$QUERY_JSON" ] || ! echo "$QUERY_JSON" | jq empty 2>/dev/null; then
@@ -177,6 +206,9 @@ class CLITools:
             echo "🚀 Executing OPAL query..."
             echo ""
             
+            # Track query start time for performance monitoring
+            START_TIME=$(date +%s)
+            
             # Execute query (simplified like the successful version)
             RESPONSE=$(curl -s "$API_URL" \
                 --request POST \
@@ -185,9 +217,30 @@ class CLITools:
                 --header "Accept: application/x-ndjson" \
                 --data "$QUERY_JSON")
             
+            END_TIME=$(date +%s)
+            QUERY_DURATION=$((END_TIME - START_TIME))
+            
             # Process response (same as successful version)
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
-                echo "📊 Query Results:"
+                echo "📊 Query Results (completed in ${QUERY_DURATION}s):"
+                
+                # Calculate and display response size info
+                RESPONSE_SIZE=$(echo "$RESPONSE" | wc -c)
+                RECORD_COUNT=$(echo "$RESPONSE" | jq -r '.data | length // 0')
+                
+                if [ "$RECORD_COUNT" -gt 0 ] && [ "$RESPONSE_SIZE" -gt 0 ]; then
+                    AVG_RECORD_SIZE=$((RESPONSE_SIZE / RECORD_COUNT))
+                    echo "📏 Response: $RECORD_COUNT records, $RESPONSE_SIZE bytes (~${AVG_RECORD_SIZE} bytes/record)"
+                    
+                    # Performance insights 
+                    if [ "$AVG_RECORD_SIZE" -gt 20000 ]; then
+                        echo "📊 Large records detected - rich log content available for analysis"
+                        if [ "$RECORD_COUNT" -gt 10 ]; then
+                            echo "💡 Consider using smaller --limit for faster initial analysis"
+                        fi
+                    fi
+                fi
+                
                 echo "$RESPONSE" | jq .
                 
                 # Check for errors and provide guidance
@@ -205,7 +258,9 @@ class CLITools:
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
                 Arg(name="filter", description="Optional filter term to search for (case-insensitive). Searches in the field specified by filter_type (defaults to 'body'). Examples: 'error', 'freighthub', 'exception'", required=False),
-                Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, body, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'body' (log content).", required=False)
+                Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, body, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'body' (log content).", required=False),
+                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,user,statusCode,body'). Use for targeted analysis or performance optimization.", required=False),
+                Arg(name="limit", description="Maximum number of records to return (default: 25, reduced for performance with large records)", required=False)
             ],
             image="alpine:latest"
         )
