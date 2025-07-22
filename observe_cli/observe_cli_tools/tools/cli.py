@@ -33,7 +33,7 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute OPAL queries on Observe datasets. Gets ALL data from the specified time interval (e.g., all records from last 15m). "
+                "Execute OPAL queries on Observe datasets. Returns the latest 100 records from the specified time interval. "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable. AI can parse and analyze the returned data."
             ),
             content="""
@@ -64,16 +64,14 @@ class CLITools:
             end_time="$end_time"
             
             # Hardcoded query that works reliably
-            opal_pipeline="pick_col *"
+            opal_pipeline="limit 100"
             
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            echo "📝 OPAL pipeline: $opal_pipeline (gets all data from specified time interval)"
-            echo "🆔 Customer ID: $OBSERVE_CUSTOMER_ID"
+            echo "📝 OPAL pipeline: $opal_pipeline"
             echo ""
             
             # Parse dataset IDs and determine the input structure
             DATASET_COUNT=$(echo "$DATASET_IDS" | tr ',' '\n' | wc -l)
-            echo "📊 Processing $DATASET_COUNT dataset(s)"
             
             # Use jq to properly construct the input array from dataset IDs
             QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
@@ -115,29 +113,20 @@ class CLITools:
                 exit 1
             fi
             
-            echo "📦 Generated Query JSON:"
-            echo "$QUERY_JSON" | jq .
-            echo ""
-            
             # Determine API endpoint - try different patterns
             API_BASE_URL=""
-            
-            # Try different URL patterns based on common Observe deployments
-            echo "🔍 Discovering API endpoint..."
             
             # Common Observe regions to try
             REGIONS="eu-1 us-1 ap-1 us-east-1 us-west-1"
             
             for REGION in $REGIONS; do
                 URL_PATTERN="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
-                echo "  Testing: $URL_PATTERN"
                 
                 if curl -s --max-time 5 --fail "$URL_PATTERN/v1/dataset?limit=1" \
                     --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                     --header "Content-Type: application/json" >/dev/null 2>&1; then
                     API_BASE_URL="$URL_PATTERN"
-                    echo "✅ API endpoint found: $API_BASE_URL"
-                    echo "💡 For future reference, your region is: $REGION"
+                    echo "✅ Using region: $REGION"
                     break
                 fi
             done
@@ -145,22 +134,17 @@ class CLITools:
             # Also try without region subdomain
             if [ -z "$API_BASE_URL" ]; then
                 URL_PATTERN="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
-                echo "  Testing: $URL_PATTERN"
                 
                 if curl -s --max-time 5 --fail "$URL_PATTERN/v1/dataset?limit=1" \
                     --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                     --header "Content-Type: application/json" >/dev/null 2>&1; then
                     API_BASE_URL="$URL_PATTERN"
-                    echo "✅ API endpoint found: $API_BASE_URL"
-                    echo "💡 Using direct customer URL without region"
+                    echo "✅ Using direct customer URL"
                 fi
             fi
             
             if [ -z "$API_BASE_URL" ]; then
                 echo "❌ Could not determine valid API endpoint"
-                echo "💡 Tried regions: $REGIONS"
-                echo "💡 Also tried direct URL: https://$OBSERVE_CUSTOMER_ID.observeinc.com"
-                echo "🔍 Please verify your OBSERVE_CUSTOMER_ID and API access"
                 API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com"
                 echo "⚠️  Falling back to: $API_BASE_URL"
             fi
@@ -194,8 +178,6 @@ class CLITools:
             fi
             
             echo "🚀 Executing OPAL query..."
-            echo "URL: $API_URL"
-            echo "Dataset IDs: $DATASET_IDS"
             echo ""
             
             # Execute query (simplified like the successful version)
@@ -222,7 +204,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="interval", description="Time interval relative to now to retrieve ALL data from (e.g., '1h' for all data from last hour, '30m' for last 30 minutes, '15m' for last 15 minutes)", required=False),
+                Arg(name="interval", description="Time interval relative to now to retrieve latest 100 records from (e.g., '15m' for last 15 minutes, '1h' for last hour)", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False)
             ],
