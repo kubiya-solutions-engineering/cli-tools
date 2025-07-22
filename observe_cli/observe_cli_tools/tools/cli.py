@@ -77,17 +77,30 @@ class CLITools:
             
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
             echo "📝 OPAL pipeline: $opal_pipeline"
+            echo "🆔 Customer ID: $OBSERVE_CUSTOMER_ID"
             echo ""
+            
+            # Parse dataset IDs and determine the input structure
+            DATASET_COUNT=$(echo "$DATASET_IDS" | tr ',' '\n' | wc -l)
+            echo "📊 Processing $DATASET_COUNT dataset(s)"
             
             # Use jq to properly construct the input array from dataset IDs
             QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                 --arg pipeline "$opal_pipeline" \
                 --arg customer_id "$OBSERVE_CUSTOMER_ID" \
                 'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
-                map({
-                    inputName: ("dataset_" + .),
-                    datasetId: ("o::" + $customer_id + ":dataset:" + .)
-                }) as $inputs |
+                . as $dataset_ids | 
+                if length == 1 then
+                    [{
+                        inputName: "main",
+                        datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
+                    }]
+                else
+                    map({
+                        inputName: ("dataset_" + .),
+                        datasetId: ("o::" + $customer_id + ":dataset:" + .)
+                    })
+                end as $inputs |
                 {
                     "query": {
                         "stages": [{
@@ -115,8 +128,54 @@ class CLITools:
             echo "$QUERY_JSON" | jq .
             echo ""
             
+            # Determine API endpoint - try different patterns
+            API_BASE_URL=""
+            
+            # Try different URL patterns based on common Observe deployments
+            echo "🔍 Discovering API endpoint..."
+            
+            # Common Observe regions to try
+            REGIONS="eu-1 us-1 ap-1 us-east-1 us-west-1"
+            
+            for REGION in $REGIONS; do
+                URL_PATTERN="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
+                echo "  Testing: $URL_PATTERN"
+                
+                if curl -s --max-time 5 --fail "$URL_PATTERN/v1/dataset?limit=1" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" >/dev/null 2>&1; then
+                    API_BASE_URL="$URL_PATTERN"
+                    echo "✅ API endpoint found: $API_BASE_URL"
+                    echo "💡 For future reference, your region is: $REGION"
+                    break
+                fi
+            done
+            
+            # Also try without region subdomain
+            if [ -z "$API_BASE_URL" ]; then
+                URL_PATTERN="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
+                echo "  Testing: $URL_PATTERN"
+                
+                if curl -s --max-time 5 --fail "$URL_PATTERN/v1/dataset?limit=1" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" >/dev/null 2>&1; then
+                    API_BASE_URL="$URL_PATTERN"
+                    echo "✅ API endpoint found: $API_BASE_URL"
+                    echo "💡 Using direct customer URL without region"
+                fi
+            fi
+            
+            if [ -z "$API_BASE_URL" ]; then
+                echo "❌ Could not determine valid API endpoint"
+                echo "💡 Tried regions: $REGIONS"
+                echo "💡 Also tried direct URL: https://$OBSERVE_CUSTOMER_ID.observeinc.com"
+                echo "🔍 Please verify your OBSERVE_CUSTOMER_ID and API access"
+                API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com"
+                echo "⚠️  Falling back to: $API_BASE_URL"
+            fi
+            
             # Build API URL with time parameters
-            API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+            API_URL="$API_BASE_URL/v1/meta/export/query"
             PARAMS=""
             
             if [ -n "$interval" ]; then
@@ -148,13 +207,30 @@ class CLITools:
             echo "Dataset IDs: $DATASET_IDS"
             echo ""
             
-            # Execute query
+            # Execute query with better error handling
             RESPONSE=$(curl -s "$API_URL" \
                 --request POST \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
                 --header "Accept: application/x-ndjson" \
-                --data "$QUERY_JSON")
+                --data "$QUERY_JSON" \
+                --max-time 120 \
+                --fail-with-body)
+            
+            CURL_EXIT_CODE=$?
+            
+            if [ $CURL_EXIT_CODE -ne 0 ]; then
+                echo "❌ Query execution failed (curl exit code: $CURL_EXIT_CODE)"
+                echo "🔍 Response body:"
+                echo "$RESPONSE"
+                echo ""
+                echo "💡 Troubleshooting tips:"
+                echo "  • Check your OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID"
+                echo "  • Verify the dataset IDs exist and you have access"
+                echo "  • Try a simpler query first (e.g., 'limit 5')"
+                echo "  • Check the OPAL syntax"
+                exit 1
+            fi
             
             # Process response
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
@@ -652,26 +728,26 @@ class CLITools:
                 "list-cache")
                     echo "🗄️  Cache Files:"
                     echo "==============="
-                    find /workspace/observe-data/cache -name "*.json" -type f -exec basename {} \; 2>/dev/null | sort || echo "No cache files found"
+                    find /workspace/observe-data/cache -name "*.json" -type f -exec basename {} \\; 2>/dev/null | sort || echo "No cache files found"
                     echo ""
                     echo "Recent cache files (last 24 hours):"
-                    find /workspace/observe-data/cache -name "*.json" -type f -mtime -1 -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5, $6, $7, $8}' || echo "No recent cache files"
+                    find /workspace/observe-data/cache -name "*.json" -type f -mtime -1 -exec ls -lh {} \\; 2>/dev/null | awk '{print $9, $5, $6, $7, $8}' || echo "No recent cache files"
                     ;;
                 
                 "list-templates")
                     echo "📋 Template Files:"
                     echo "=================="
                     if [ -f "/workspace/observe-data/templates/index.json" ]; then
-                        jq -r '.[] | "• \(.name) (\(.type)) - \(.created)"' /workspace/observe-data/templates/index.json 2>/dev/null || echo "No templates index found"
+                        jq -r '.[] | "• \\(.name) (\\(.type)) - \\(.created)"' /workspace/observe-data/templates/index.json 2>/dev/null || echo "No templates index found"
                     else
-                        find /workspace/observe-data/templates -name "*.opal" -type f -exec basename {} \; 2>/dev/null | sort || echo "No template files found"
+                        find /workspace/observe-data/templates -name "*.opal" -type f -exec basename {} \\; 2>/dev/null | sort || echo "No template files found"
                     fi
                     ;;
                 
                 "list-metrics")
                     echo "📈 Performance Metrics:"
                     echo "======================"
-                    find /workspace/observe-data/metrics -name "*.json" -type f -exec basename {} \; 2>/dev/null | sort -r | head -10 || echo "No metrics files found"
+                    find /workspace/observe-data/metrics -name "*.json" -type f -exec basename {} \\; 2>/dev/null | sort -r | head -10 || echo "No metrics files found"
                     echo ""
                     if [ -n "$(find /workspace/observe-data/metrics -name "*.json" -type f 2>/dev/null)" ]; then
                         echo "Latest performance summary:"
