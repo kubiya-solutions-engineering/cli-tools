@@ -42,6 +42,9 @@ class CLITools:
             if ! command -v jq >/dev/null 2>&1; then
                 apk add --no-cache jq
             fi
+            if ! command -v column >/dev/null 2>&1; then
+                apk add --no-cache util-linux
+            fi
             
             # Validate environment
             if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
