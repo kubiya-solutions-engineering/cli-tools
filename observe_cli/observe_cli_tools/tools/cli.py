@@ -62,14 +62,60 @@ class CLITools:
                 VALIDATION_ERRORS="${VALIDATION_ERRORS}⚠️  Consider using '~' operator for string matching: service_name ~ \"value\"\n"
             fi
             
+            # Check for missing spaces around operators
+            if echo "$opal_query" | grep -qE '[a-zA-Z_]~"'; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ Missing space before ~ operator. Use: field ~ \"value\" (not field~\"value\")\n"
+            fi
+            
+            if echo "$opal_query" | grep -qE '"~[a-zA-Z_]'; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ Missing space after ~ operator. Use: field ~ \"value\" (not field~\"value\")\n"
+            fi
+            
+            # Check for SQL-like boolean operators
+            if echo "$opal_query" | grep -q " and "; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}❌ Use 'and' in OPAL, but ensure proper spacing. Better: use 'or' for multiple conditions.\n"
+            fi
+            
+            # Check if query starts without 'filter'
+            if ! echo "$opal_query" | grep -qE "^(filter|pick_col|stats)"; then
+                VALIDATION_ERRORS="${VALIDATION_ERRORS}⚠️  OPAL queries typically start with 'filter', 'pick_col', or 'stats'\n"
+            fi
+            
             if [ -n "$VALIDATION_ERRORS" ]; then
                 echo "⚠️ OPAL Query Issues Detected:"
                 echo -e "$VALIDATION_ERRORS"
                 echo "💡 Proper OPAL syntax examples:"
                 echo "   • filter message ~ \"freighthub\""
+                echo "   • filter message ~ \"freighthub\" or message ~ \"FreightHub\""
                 echo "   • filter service_name ~ \"freight\" and level == \"ERROR\""
+                echo "   • Use proper spacing around operators: field ~ \"value\""
                 echo "   • Use time_range parameter (15m, 1h, 24h) instead of query-based time filtering"
                 echo ""
+                
+                # Try to auto-fix some common issues
+                echo "🔧 Attempting automatic fixes..."
+                ORIGINAL_QUERY="$opal_query"
+                
+                # Fix missing spaces around ~ operator
+                opal_query=$(echo "$opal_query" | sed 's/\([a-zA-Z_]\)~/\1 ~/g' | sed 's/~\([a-zA-Z_]\)/~ \1/g')
+                
+                # Suggest better field names based on common patterns
+                if echo "$opal_query" | grep -q "_source"; then
+                    echo "💡 Field name suggestion: Consider using 'message' instead of '_source'"
+                    echo "   Example: filter message ~ \"freighthub\" or message ~ \"FreightHub\""
+                fi
+                
+                # Add 'filter' prefix if missing and doesn't start with known commands
+                if ! echo "$opal_query" | grep -qE "^(filter|pick_col|stats)"; then
+                    opal_query="filter $opal_query"
+                fi
+                
+                if [ "$opal_query" != "$ORIGINAL_QUERY" ]; then
+                    echo "✅ Auto-corrected query: $opal_query"
+                    echo "💡 Consider this manual correction based on working examples:"
+                    SUGGESTED_QUERY=$(echo "$opal_query" | sed 's/_source/message/g')
+                    echo "   $SUGGESTED_QUERY"
+                fi
             fi
             
             # Get dataset_id from DATASET_IDS environment variable
