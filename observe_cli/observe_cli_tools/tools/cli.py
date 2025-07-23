@@ -46,6 +46,7 @@ class CLITools:
             fi
             
             echo "🔧 Using dataset IDs: $DATASET_IDS"
+            sleep 1
             
             # Install required tools
             apk add --no-cache jq curl bc >/dev/null 2>&1 || {
@@ -91,6 +92,7 @@ class CLITools:
                 # Default behavior - include all fields but warn about potential size
                 echo "💡 Including all fields (including body with log content)"
                 echo "   Note: Some records can be 40k+ characters - using limit=$limit_count for performance"
+                sleep 1
             fi
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
@@ -98,6 +100,8 @@ class CLITools:
             if [ -n "$filter_term" ]; then
                 pipeline_str=$(printf '%sfilter %s ~ "%s" | limit %s' "$field_selection" "$filter_type" "$filter_term" "$limit_count")
                 echo "📝 OPAL pipeline: $pipeline_str"
+                echo ""
+                sleep 1
                 QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                     --arg filter_pipeline "$pipeline_str" \
                     --arg customer_id "$OBSERVE_CUSTOMER_ID" \
@@ -126,6 +130,8 @@ class CLITools:
             else
                 pipeline_str=$(printf '%slimit %s' "$field_selection" "$limit_count")
                 echo "📝 OPAL pipeline: $pipeline_str"
+                echo ""
+                sleep 1
                 QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
                     --arg customer_id "$OBSERVE_CUSTOMER_ID" \
                     --arg pipeline "$pipeline_str" \
@@ -197,6 +203,7 @@ class CLITools:
             
             echo "🚀 Executing OPAL query..."
             echo ""
+            sleep 1
             
             # Track query start time for performance monitoring
             START_TIME=$(date +%s)
@@ -207,6 +214,7 @@ class CLITools:
             
             for REGION in "us-1" "eu-1"; do
                 echo "🔍 Trying $REGION region..."
+                sleep 1
                 
                 # Set API key and base URL based on region
                 if [ "$REGION" = "us-1" ]; then
@@ -230,6 +238,7 @@ class CLITools:
                 echo "   🌍 Region: $REGION_DISPLAY"
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
                 echo "   ⏱️  Starting curl request..."
+                sleep 1
                 
                 CURL_START=$(date +%s)
                 
@@ -249,6 +258,7 @@ class CLITools:
                 CURL_DURATION=$((CURL_END - CURL_START))
                 
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
+                sleep 1
                 
                 if [ $CURL_EXIT_CODE -ne 0 ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
@@ -263,6 +273,7 @@ class CLITools:
                     esac
                     echo "   📝 Curl output: $(echo "$RESPONSE" | tail -5)"
                     echo ""
+                    sleep 1
                     continue
                 fi
                 
@@ -272,6 +283,7 @@ class CLITools:
                     REGION_USED="$REGION"
                     RESPONSE='{"data":[],"message":"No data found matching your query criteria"}'
                     echo ""
+                    sleep 1
                     break
                 fi
                 
@@ -284,10 +296,12 @@ class CLITools:
                     echo "   ❌ No JSON found in response"
                     echo "   📄 Raw response: $(echo "$RESPONSE" | head -5)"
                     echo ""
+                    sleep 1
                     continue
                 fi
                 
                 echo "   🔍 Testing JSON validity..."
+                sleep 1
                 
                 if echo "$JSON_RESPONSE" | jq empty >/dev/null 2>&1; then
                     echo "   ✅ Valid JSON response"
@@ -297,18 +311,21 @@ class CLITools:
                     if [ -n "$ERROR_CHECK" ]; then
                         echo "   ❌ $REGION region returned API error: $ERROR_CHECK"
                         echo ""
+                        sleep 1
                         continue
                     else
                         REGION_USED="$REGION"
                         RESPONSE="$JSON_RESPONSE"
                         echo "   ✅ $REGION region succeeded!"
                         echo ""
+                        sleep 1
                         break
                     fi
                 else
                     echo "   ❌ Invalid JSON response"
                     echo "   📄 First 200 chars: $(echo "$JSON_RESPONSE" | head -c 200)..."
                     echo ""
+                    sleep 1
                     continue
                 fi
             done
@@ -319,10 +336,12 @@ class CLITools:
             if [ -z "$REGION_USED" ]; then
                 echo "❌ Failed to execute query in both US and EU regions"
                 echo "💡 Verify your dataset IDs are correct and you have access to them"
+                sleep 1
                 exit 1
             fi
             
             echo "🌍 Using region: $REGION_USED"
+            sleep 1
             
             # Process response (same as successful version)
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
@@ -535,6 +554,7 @@ class CLITools:
             
             for REGION in "us-1" "eu-1"; do
                 echo "🔍 Trying $REGION region..."
+                sleep 1
                 
                 # Set API key and base URL based on region
                 if [ "$REGION" = "us-1" ]; then
@@ -551,6 +571,7 @@ class CLITools:
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
                 echo "   🌍 Region: $REGION_DISPLAY"
                 echo "   ⏱️  Starting curl request..."
+                sleep 1
                 
                 CURL_START=$(date +%s)
                 DATASET_INFO=$(curl -s --max-time 30 --fail \
@@ -562,6 +583,7 @@ class CLITools:
                 CURL_DURATION=$((CURL_END - CURL_START))
                 
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
+                sleep 1
                 
                 if [ $CURL_EXIT_CODE -ne 0 ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
@@ -572,16 +594,19 @@ class CLITools:
                         22) echo "   💡 HTTP error response" ;;
                         *) echo "   💡 Unknown curl error" ;;
                     esac
+                    sleep 1
                     continue
                 fi
                 
                 if [ -z "$DATASET_INFO" ]; then
                     echo "   ❌ Empty response"
+                    sleep 1
                     continue
                 fi
                 
                 echo "   📏 Response length: $(echo "$DATASET_INFO" | wc -c) characters"
                 echo "   🔍 Testing JSON validity..."
+                sleep 1
                 
                 if echo "$DATASET_INFO" | jq empty >/dev/null 2>&1; then
                     echo "   ✅ Valid JSON response"
@@ -589,15 +614,18 @@ class CLITools:
                     if echo "$DATASET_INFO" | jq -e '.error' >/dev/null 2>&1; then
                         ERROR_MSG=$(echo "$DATASET_INFO" | jq -r '.error // "Unknown error"')
                         echo "   ❌ $REGION region returned error: $ERROR_MSG"
+                        sleep 1
                         continue
                     else
                         REGION_USED="$REGION"
                         echo "   ✅ $REGION region succeeded!"
+                        sleep 1
                         break
                     fi
                 else
                     echo "   ❌ Invalid JSON response"
                     echo "   📄 First 200 chars: $(echo "$DATASET_INFO" | head -c 200)..."
+                    sleep 1
                     continue
                 fi
             done
@@ -605,10 +633,12 @@ class CLITools:
             if [ -z "$REGION_USED" ]; then
                 echo "❌ Failed to fetch dataset metadata from both US and EU regions"
                 echo "💡 Verify dataset ID exists and you have access to it"
+                sleep 1
                 exit 1
             fi
             
             echo "🌍 Using region: $REGION_USED"
+            sleep 1
             echo ""
             
             # Basic dataset info
@@ -771,6 +801,7 @@ class CLITools:
             
             for REGION in "us-1" "eu-1"; do
                 echo "🔍 Trying $REGION region..."
+                sleep 1
                 
                 # Set API key and base URL based on region
                 if [ "$REGION" = "us-1" ]; then
@@ -787,6 +818,7 @@ class CLITools:
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
                 echo "   🌍 Region: $REGION_DISPLAY"
                 echo "   ⏱️  Starting curl request..."
+                sleep 1
                 
                 CURL_START=$(date +%s)
                 HEALTH_RESPONSE=$(curl -s --max-time 10 --fail \
@@ -798,6 +830,7 @@ class CLITools:
                 CURL_DURATION=$((CURL_END - CURL_START))
                 
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
+                sleep 1
                 
                 if [ $CURL_EXIT_CODE -ne 0 ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
@@ -808,16 +841,19 @@ class CLITools:
                         22) echo "   💡 HTTP error response" ;;
                         *) echo "   💡 Unknown curl error" ;;
                     esac
+                    sleep 1
                     continue
                 fi
                 
                 if [ -z "$HEALTH_RESPONSE" ]; then
                     echo "   ❌ Empty response"
+                    sleep 1
                     continue
                 fi
                 
                 echo "   📏 Response length: $(echo "$HEALTH_RESPONSE" | wc -c) characters"
                 echo "   🔍 Testing JSON validity..."
+                sleep 1
                 
                 if echo "$HEALTH_RESPONSE" | jq empty >/dev/null 2>&1; then
                     echo "   ✅ Valid JSON response"
@@ -825,15 +861,18 @@ class CLITools:
                     if echo "$HEALTH_RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
                         ERROR_MSG=$(echo "$HEALTH_RESPONSE" | jq -r '.error // "Unknown error"')
                         echo "   ❌ $REGION region returned error: $ERROR_MSG"
+                        sleep 1
                         continue
                     else
                         REGION_USED="$REGION"
                         echo "   ✅ $REGION region succeeded!"
+                        sleep 1
                         break
                     fi
                 else
                     echo "   ❌ Invalid JSON response"
                     echo "   📄 First 200 chars: $(echo "$HEALTH_RESPONSE" | head -c 200)..."
+                    sleep 1
                     continue
                 fi
             done
@@ -844,10 +883,12 @@ class CLITools:
             if [ -z "$REGION_USED" ]; then
                 echo "❌ Failed to check API health in both US and EU regions"
                 echo "💡 Verify your credentials and network connectivity"
+                sleep 1
                 exit 1
             fi
             
             echo "🌍 Using region: $REGION_USED"
+            sleep 1
             echo "✅ API Status: Healthy"
             echo "⚡ Response Time: ${API_LATENCY}ms"
             
