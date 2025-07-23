@@ -52,8 +52,8 @@ class ObserveCLITool(Tool):
             image=image,
             icon_url=OBSERVE_CLI_ICON_URL,
             type="docker",
-            secrets=["OBSERVE_API_KEY", "OBSERVE_CUSTOMER_ID"],
-            env=["DATASET_IDS"],
+            secrets=["OBSERVE_API_KEY"],
+            env=["DATASET_IDS", "OBSERVE_CUSTOMER_ID"],
             with_volumes=[{
                 "path": "/workspace/observe-data",
                 "name": "observe-data"
