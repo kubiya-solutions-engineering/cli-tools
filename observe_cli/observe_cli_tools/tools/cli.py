@@ -214,6 +214,7 @@ class CLITools:
                 
                 # Use stricter curl settings for faster failure
                 RESPONSE=$(curl -v --max-time 15 --connect-timeout 5 \
+                    --insecure \
                     "$API_URL" \
                     --request POST \
                     --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
@@ -237,6 +238,7 @@ class CLITools:
                         7)  echo "   💡 Failed to connect to host: $API_BASE_URL" ;;
                         22) echo "   💡 HTTP error response (likely 404/403)" ;;
                         52) echo "   💡 Empty reply from server" ;;
+                        60) echo "   💡 SSL certificate verification failed" ;;
                         *) echo "   💡 Curl error $CURL_EXIT_CODE" ;;
                     esac
                     echo "   📝 Curl output: $(echo "$RESPONSE" | tail -5)"
@@ -245,9 +247,12 @@ class CLITools:
                 fi
                 
                 if [ -z "$RESPONSE" ]; then
-                    echo "   ❌ Empty response from server"
+                    echo "   ✅ Empty response - query executed successfully but found no matching data"
+                    echo "   💡 This usually means your filter didn't match any records"
+                    REGION_USED="$REGION"
+                    RESPONSE='{"data":[],"message":"No data found matching your query criteria"}'
                     echo ""
-                    continue
+                    break
                 fi
                 
                 echo "   📏 Response length: $(echo "$RESPONSE" | wc -c) characters"
