@@ -206,17 +206,50 @@ class CLITools:
                 fi
                 
                 echo "   📡 Full API URL: $API_URL"
+                sleep 1
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
+                sleep 1
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
+                sleep 1
                 echo "   ⏱️  Starting curl request..."
+                sleep 1
                 
                 CURL_START=$(date +%s)
                 
                 # Debug: show exact command being run
                 echo "   🐛 Debug: curl command will be:"
+                sleep 1
                 echo "   curl -s --insecure '$API_URL' --request POST --header 'Authorization: Bearer $OBSERVE_CUSTOMER_ID [HIDDEN]' --header 'Content-Type: application/json' --header 'Accept: application/x-ndjson' --data-raw '[JSON]' --fail"
+                sleep 2
                 
-                # Add temporary timeout for debugging
+                # First try without --fail to see what we actually get
+                echo "   🔍 Testing without --fail first..."
+                sleep 1
+                TEST_RESPONSE=$(timeout 5 curl -s \
+                    --insecure \
+                    "$API_URL" \
+                    --request POST \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" \
+                    --header "Accept: application/x-ndjson" \
+                    --data-raw "$QUERY_JSON" \
+                    2>&1)
+                TEST_EXIT_CODE=$?
+                
+                echo "   📊 Test response exit code: $TEST_EXIT_CODE"
+                sleep 1
+                echo "   📏 Test response length: $(echo "$TEST_RESPONSE" | wc -c) characters"
+                sleep 1
+                if [ ${#TEST_RESPONSE} -lt 500 ]; then
+                    echo "   📄 Test response content: $TEST_RESPONSE"
+                else
+                    echo "   📄 Test response (first 200 chars): $(echo "$TEST_RESPONSE" | head -c 200)..."
+                fi
+                sleep 2
+                
+                # Now try with --fail
+                echo "   🚀 Now trying with --fail..."
+                sleep 1
                 RESPONSE=$(timeout 10 curl -s \
                     --insecure \
                     "$API_URL" \
