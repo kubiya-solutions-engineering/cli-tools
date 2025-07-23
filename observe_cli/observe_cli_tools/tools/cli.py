@@ -61,8 +61,8 @@ class CLITools:
             NA_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.NA // empty')
             EU_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.EU // empty')
             
-            echo "🔧 Debug - NA API Key length: ${#NA_API_KEY}"
-            echo "🔧 Debug - EU API Key length: ${#EU_API_KEY}"
+            echo "🔧 Debug - NA API Key: ${NA_API_KEY}"
+            echo "🔧 Debug - EU API Key: ${EU_API_KEY}"
             sleep 1
             
             if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
