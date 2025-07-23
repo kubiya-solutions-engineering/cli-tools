@@ -208,12 +208,12 @@ class CLITools:
                 echo "   📡 Full API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
-                echo "   ⏱️  Starting curl request (timeout: 30s)..."
+                echo "   ⏱️  Starting curl request..."
                 
                 CURL_START=$(date +%s)
                 
                 # Use stricter curl settings for faster failure
-                RESPONSE=$(curl -v --max-time 30 --connect-timeout 5 \
+                RESPONSE=$(curl -s \
                     --insecure \
                     "$API_URL" \
                     --request POST \
@@ -221,8 +221,7 @@ class CLITools:
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
-                    --fail \
-                    2>&1)
+                    --fail)
                     
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
