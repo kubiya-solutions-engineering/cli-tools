@@ -236,6 +236,7 @@ class CLITools:
                 echo "   📡 Full API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"  
                 echo "   🌍 Region: $REGION_DISPLAY"
+                echo "   🗝️  API Key: $(echo "$CURRENT_API_KEY" | cut -c1-8)...$(echo "$CURRENT_API_KEY" | tail -c9)"
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
                 echo "   ⏱️  Starting curl request..."
                 sleep 1
