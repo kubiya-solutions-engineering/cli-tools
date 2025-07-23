@@ -212,8 +212,12 @@ class CLITools:
                 
                 CURL_START=$(date +%s)
                 
-                # Use stricter curl settings for faster failure
-                RESPONSE=$(curl -s \
+                # Debug: show exact command being run
+                echo "   🐛 Debug: curl command will be:"
+                echo "   curl -s --insecure '$API_URL' --request POST --header 'Authorization: Bearer $OBSERVE_CUSTOMER_ID [HIDDEN]' --header 'Content-Type: application/json' --header 'Accept: application/x-ndjson' --data-raw '[JSON]' --fail"
+                
+                # Add temporary timeout for debugging
+                RESPONSE=$(timeout 10 curl -s \
                     --insecure \
                     "$API_URL" \
                     --request POST \
@@ -221,7 +225,8 @@ class CLITools:
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
-                    --fail)
+                    --fail \
+                    2>&1)
                     
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
