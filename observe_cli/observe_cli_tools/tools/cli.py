@@ -45,6 +45,9 @@ class CLITools:
                 exit 1
             fi
             
+            echo "🔧 Debug - Raw OBSERVE_API_KEYS: $OBSERVE_API_KEYS"
+            sleep 1
+            
             echo "🔧 Using dataset IDs: $DATASET_IDS"
             sleep 1
             
@@ -57,6 +60,10 @@ class CLITools:
             # Parse API keys from JSON
             NA_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.NA // empty')
             EU_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.EU // empty')
+            
+            echo "🔧 Debug - NA API Key length: ${#NA_API_KEY}"
+            echo "🔧 Debug - EU API Key length: ${#EU_API_KEY}"
+            sleep 1
             
             if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
                 echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
@@ -227,6 +234,9 @@ class CLITools:
                     REGION_DISPLAY="EU"
                 fi
                 
+                echo "   🔧 Debug - Current API Key length: ${#CURRENT_API_KEY}"
+                sleep 1
+                
                 API_URL="$API_BASE_URL/v1/meta/export/query"
                 
                 if [ -n "$PARAMS" ]; then
@@ -236,7 +246,15 @@ class CLITools:
                 echo "   📡 Full API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"  
                 echo "   🌍 Region: $REGION_DISPLAY"
-                echo "   🗝️  API Key: $(echo "$CURRENT_API_KEY" | cut -c1-8)...$(echo "$CURRENT_API_KEY" | tail -c9)"
+                
+                # Display masked API key if it exists
+                if [ -n "$CURRENT_API_KEY" ] && [ ${#CURRENT_API_KEY} -gt 16 ]; then
+                    API_KEY_START=$(echo "$CURRENT_API_KEY" | cut -c1-8)
+                    API_KEY_END=$(echo "$CURRENT_API_KEY" | rev | cut -c1-8 | rev)
+                    echo "   🗝️  API Key: ${API_KEY_START}...${API_KEY_END}"
+                else
+                    echo "   ❌ API Key: MISSING or TOO SHORT (length: ${#CURRENT_API_KEY})"
+                fi
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
                 echo "   ⏱️  Starting curl request..."
                 sleep 1
