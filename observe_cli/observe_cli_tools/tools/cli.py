@@ -82,7 +82,7 @@ class CLITools:
             
             # Default values for performance optimization
             if [ -z "$filter_type" ]; then
-                filter_type="body"
+                filter_type="message"
             fi
             
             if [ -z "$limit_count" ]; then
@@ -97,7 +97,7 @@ class CLITools:
                 echo "📝 Field selection: $fields"
             else
                 # Default behavior - include all fields but warn about potential size
-                echo "💡 Including all fields (including body with log content)"
+                echo "💡 Including all fields (including message with log content)"
                 echo "   Note: Some records can be 40k+ characters - using limit=$limit_count for performance"
                 sleep 1
             fi
@@ -401,9 +401,9 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now (e.g., '5m', '15m', '30m', '1h')", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Optional filter term to search for (case-insensitive). Searches in the field specified by filter_type (defaults to 'body'). Examples: 'error', 'freighthub', 'exception'", required=False),
-                Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, body, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'body' (log content).", required=False),
-                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,user,statusCode,body'). Use for targeted analysis or performance optimization.", required=False),
+                Arg(name="filter", description="Optional filter term to search for (case-insensitive). Searches in the field specified by filter_type (defaults to 'message'). Examples: 'error', 'freighthub', 'exception'", required=False),
+                Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, message, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'message' (log content).", required=False),
+                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,user,statusCode,message'). Use for targeted analysis or performance optimization.", required=False),
                 Arg(name="limit", description="Maximum number of records to return (default: 25, reduced for performance with large records)", required=False)
             ],
             image="alpine:latest"
