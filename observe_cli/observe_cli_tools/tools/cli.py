@@ -208,12 +208,12 @@ class CLITools:
                 echo "   📡 Full API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
-                echo "   ⏱️  Starting curl request (timeout: 15s)..."
+                echo "   ⏱️  Starting curl request (timeout: 30s)..."
                 
                 CURL_START=$(date +%s)
                 
                 # Use stricter curl settings for faster failure
-                RESPONSE=$(curl -v --max-time 15 --connect-timeout 5 \
+                RESPONSE=$(curl -v --max-time 30 --connect-timeout 5 \
                     --insecure \
                     "$API_URL" \
                     --request POST \
@@ -236,7 +236,7 @@ class CLITools:
                         28) echo "   💡 Timeout occurred (${CURL_DURATION}s)" ;;
                         6)  echo "   💡 Couldn't resolve host: $API_BASE_URL" ;;
                         7)  echo "   💡 Failed to connect to host: $API_BASE_URL" ;;
-                        22) echo "   💡 HTTP error response (likely 404/403)" ;;
+                        22) echo "   💡 HTTP error response (404 - wrong region)" ;;
                         52) echo "   💡 Empty reply from server" ;;
                         60) echo "   💡 SSL certificate verification failed" ;;
                         *) echo "   💡 Curl error $CURL_EXIT_CODE" ;;
