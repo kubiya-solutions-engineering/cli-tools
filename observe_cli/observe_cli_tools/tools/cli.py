@@ -40,8 +40,8 @@ class CLITools:
             #!/bin/sh
             
             # Validate environment
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$DATASET_IDS" ]; then
-                echo "❌ OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, and DATASET_IDS are required"
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$DATASET_IDS" ]; then
+                echo "❌ OBSERVE_API_KEYS, OBSERVE_CUSTOMER_ID, and DATASET_IDS are required"
                 exit 1
             fi
             
@@ -52,6 +52,16 @@ class CLITools:
                 echo "❌ Failed to install jq, curl, and bc"
                 exit 1
             }
+            
+            # Parse API keys from JSON
+            NA_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.NA // empty')
+            EU_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.EU // empty')
+            
+            if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
+                echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
+                echo "Expected format: {\"NA\": \"key1\", \"EU\": \"key2\"}"
+                exit 1
+            fi
             
             # Parse arguments
             interval="$interval"
@@ -197,7 +207,18 @@ class CLITools:
             
             for REGION in "us-1" "eu-1"; do
                 echo "🔍 Trying $REGION region..."
-                API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
+                
+                # Set API key and base URL based on region
+                if [ "$REGION" = "us-1" ]; then
+                    API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com"
+                    CURRENT_API_KEY="$NA_API_KEY"
+                    REGION_DISPLAY="US/NA"
+                else
+                    API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com"
+                    CURRENT_API_KEY="$EU_API_KEY"
+                    REGION_DISPLAY="EU"
+                fi
+                
                 API_URL="$API_BASE_URL/v1/meta/export/query"
                 
                 if [ -n "$PARAMS" ]; then
@@ -206,6 +227,7 @@ class CLITools:
                 
                 echo "   📡 Full API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"  
+                echo "   🌍 Region: $REGION_DISPLAY"
                 echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
                 echo "   ⏱️  Starting curl request..."
                 
@@ -216,7 +238,7 @@ class CLITools:
                     --insecure \
                     "$API_URL" \
                     --request POST \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $CURRENT_API_KEY" \
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
@@ -485,8 +507,18 @@ class CLITools:
             if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
             
             # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$dataset_id" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, dataset_id"
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$dataset_id" ]; then
+                echo "❌ Missing required parameters: OBSERVE_API_KEYS, OBSERVE_CUSTOMER_ID, dataset_id"
+                exit 1
+            fi
+            
+            # Parse API keys from JSON
+            NA_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.NA // empty')
+            EU_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.EU // empty')
+            
+            if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
+                echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
+                echo "Expected format: {\"NA\": \"key1\", \"EU\": \"key2\"}"
                 exit 1
             fi
             
@@ -503,15 +535,27 @@ class CLITools:
             
             for REGION in "us-1" "eu-1"; do
                 echo "🔍 Trying $REGION region..."
-                API_URL="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset/$dataset_id"
+                
+                # Set API key and base URL based on region
+                if [ "$REGION" = "us-1" ]; then
+                    API_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/dataset/$dataset_id"
+                    CURRENT_API_KEY="$NA_API_KEY"
+                    REGION_DISPLAY="US/NA"
+                else
+                    API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$dataset_id"
+                    CURRENT_API_KEY="$EU_API_KEY"
+                    REGION_DISPLAY="EU"
+                fi
+                
                 echo "   📡 API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
+                echo "   🌍 Region: $REGION_DISPLAY"
                 echo "   ⏱️  Starting curl request..."
                 
                 CURL_START=$(date +%s)
                 DATASET_INFO=$(curl -s --max-time 30 --fail \
                     "$API_URL" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $CURRENT_API_KEY" \
                     --header "Content-Type: application/json")
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
@@ -594,9 +638,18 @@ class CLITools:
                     }
                 }')
             
+            # Set the correct API key and URL based on the region that worked
+            if [ "$REGION_USED" = "us-1" ]; then
+                SAMPLE_API_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query"
+                SAMPLE_API_KEY="$NA_API_KEY"
+            else
+                SAMPLE_API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+                SAMPLE_API_KEY="$EU_API_KEY"
+            fi
+            
             SAMPLE_DATA=$(curl -s --max-time 30 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.$REGION_USED.observeinc.com/v1/meta/export/query" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                "$SAMPLE_API_URL" \
+                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $SAMPLE_API_KEY" \
                 --header "Content-Type: application/json" \
                 --request POST \
                 --data "$SAMPLE_PAYLOAD" 2>/dev/null)
@@ -693,8 +746,18 @@ class CLITools:
             echo ""
             
             # Validate connection
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
                 echo "❌ Missing credentials"
+                exit 1
+            fi
+            
+            # Parse API keys from JSON
+            NA_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.NA // empty')
+            EU_API_KEY=$(echo "$OBSERVE_API_KEYS" | jq -r '.EU // empty')
+            
+            if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
+                echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
+                echo "Expected format: {\"NA\": \"key1\", \"EU\": \"key2\"}"
                 exit 1
             fi
             
@@ -708,15 +771,27 @@ class CLITools:
             
             for REGION in "us-1" "eu-1"; do
                 echo "🔍 Trying $REGION region..."
-                API_URL="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset?limit=1"
+                
+                # Set API key and base URL based on region
+                if [ "$REGION" = "us-1" ]; then
+                    API_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/dataset?limit=1"
+                    CURRENT_API_KEY="$NA_API_KEY"
+                    REGION_DISPLAY="US/NA"
+                else
+                    API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?limit=1"
+                    CURRENT_API_KEY="$EU_API_KEY"
+                    REGION_DISPLAY="EU"
+                fi
+                
                 echo "   📡 API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
+                echo "   🌍 Region: $REGION_DISPLAY"
                 echo "   ⏱️  Starting curl request..."
                 
                 CURL_START=$(date +%s)
                 HEALTH_RESPONSE=$(curl -s --max-time 10 --fail \
                     "$API_URL" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $CURRENT_API_KEY" \
                     --header "Content-Type: application/json")
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
@@ -801,9 +876,18 @@ class CLITools:
                                 }
                             }')
                         
+                        # Set the correct API key and URL based on the region that worked
+                        if [ "$REGION_USED" = "us-1" ]; then
+                            BENCHMARK_API_URL="https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query"
+                            BENCHMARK_API_KEY="$NA_API_KEY"
+                        else
+                            BENCHMARK_API_URL="https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query"
+                            BENCHMARK_API_KEY="$EU_API_KEY"
+                        fi
+                        
                         BENCHMARK_RESPONSE=$(curl -s --max-time 60 --fail \
-                            "https://$OBSERVE_CUSTOMER_ID.$REGION_USED.observeinc.com/v1/meta/export/query" \
-                            --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                            "$BENCHMARK_API_URL" \
+                            --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $BENCHMARK_API_KEY" \
                             --header "Content-Type: application/json" \
                             --request POST \
                             --data "$BENCHMARK_PAYLOAD" 2>/dev/null)
