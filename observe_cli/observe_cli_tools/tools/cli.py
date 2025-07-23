@@ -205,18 +205,24 @@ class CLITools:
                     API_URL="$API_URL?$PARAMS"
                 fi
                 
-                echo "   📡 API URL: $API_URL"
+                echo "   📡 Full API URL: $API_URL"
                 echo "   🔑 Customer ID: $OBSERVE_CUSTOMER_ID"
-                echo "   ⏱️  Starting curl request..."
+                echo "   📦 Query payload size: $(echo "$QUERY_JSON" | wc -c) bytes"
+                echo "   ⏱️  Starting curl request (timeout: 15s)..."
                 
                 CURL_START=$(date +%s)
-                RESPONSE=$(curl -s --max-time 30 \
+                
+                # Use stricter curl settings for faster failure
+                RESPONSE=$(curl -v --max-time 15 --connect-timeout 5 \
                     "$API_URL" \
                     --request POST \
                     --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
-                    --data "$QUERY_JSON")
+                    --data-raw "$QUERY_JSON" \
+                    --fail \
+                    2>&1)
+                    
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
                 CURL_DURATION=$((CURL_END - CURL_START))
@@ -226,39 +232,58 @@ class CLITools:
                 if [ $CURL_EXIT_CODE -ne 0 ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
                     case $CURL_EXIT_CODE in
-                        28) echo "   💡 Timeout occurred" ;;
-                        6)  echo "   💡 Couldn't resolve host" ;;
-                        7)  echo "   💡 Failed to connect to host" ;;
-                        22) echo "   💡 HTTP error response" ;;
-                        *) echo "   💡 Unknown curl error" ;;
+                        28) echo "   💡 Timeout occurred (${CURL_DURATION}s)" ;;
+                        6)  echo "   💡 Couldn't resolve host: $API_BASE_URL" ;;
+                        7)  echo "   💡 Failed to connect to host: $API_BASE_URL" ;;
+                        22) echo "   💡 HTTP error response (likely 404/403)" ;;
+                        52) echo "   💡 Empty reply from server" ;;
+                        *) echo "   💡 Curl error $CURL_EXIT_CODE" ;;
                     esac
+                    echo "   📝 Curl output: $(echo "$RESPONSE" | tail -5)"
+                    echo ""
                     continue
                 fi
                 
                 if [ -z "$RESPONSE" ]; then
-                    echo "   ❌ Empty response"
+                    echo "   ❌ Empty response from server"
+                    echo ""
                     continue
                 fi
                 
                 echo "   📏 Response length: $(echo "$RESPONSE" | wc -c) characters"
+                
+                # Extract just the JSON part (curl -v adds debug info)
+                JSON_RESPONSE=$(echo "$RESPONSE" | sed -n '/^{/,$p' | tail -n +1)
+                
+                if [ -z "$JSON_RESPONSE" ]; then
+                    echo "   ❌ No JSON found in response"
+                    echo "   📄 Raw response: $(echo "$RESPONSE" | head -5)"
+                    echo ""
+                    continue
+                fi
+                
                 echo "   🔍 Testing JSON validity..."
                 
-                # Check if the response is successful (contains data or is valid JSON without major errors)
-                if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
+                if echo "$JSON_RESPONSE" | jq empty >/dev/null 2>&1; then
                     echo "   ✅ Valid JSON response"
+                    
                     # Check if it's an error response
-                    if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
-                        ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // "Unknown error"')
-                        echo "   ❌ $REGION region returned error: $ERROR_MSG"
+                    ERROR_CHECK=$(echo "$JSON_RESPONSE" | jq -r '.error // empty' 2>/dev/null)
+                    if [ -n "$ERROR_CHECK" ]; then
+                        echo "   ❌ $REGION region returned API error: $ERROR_CHECK"
+                        echo ""
                         continue
                     else
                         REGION_USED="$REGION"
+                        RESPONSE="$JSON_RESPONSE"
                         echo "   ✅ $REGION region succeeded!"
+                        echo ""
                         break
                     fi
                 else
                     echo "   ❌ Invalid JSON response"
-                    echo "   📄 First 200 chars: $(echo "$RESPONSE" | head -c 200)..."
+                    echo "   📄 First 200 chars: $(echo "$JSON_RESPONSE" | head -c 200)..."
+                    echo ""
                     continue
                 fi
             done
