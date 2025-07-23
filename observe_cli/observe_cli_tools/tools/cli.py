@@ -29,42 +29,24 @@ class CLITools:
             raise
 
     def execute_opal_query(self) -> ObserveCLITool:
-        """Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, 
-        optionally filtered by content in any field. Supports field selection for performance optimization with large records. 
-        Automatically uses dataset IDs from US_DATASET_IDS or EU_DATASET_IDS environment variable. AI can parse and analyze the returned data."""
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
                 "Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, "
                 "optionally filtered by content in any field. Supports field selection for performance optimization with large records. "
-                "Automatically uses dataset IDs from US_DATASET_IDS or EU_DATASET_IDS environment variable and selects the appropriate regional endpoint."
+                "Automatically uses dataset IDs from DATASET_IDS environment variable and tries both US and EU regional endpoints."
             ),
             content="""
             #!/bin/sh
             set -e
             
             # Validate environment
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
-                echo "❌ OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID are required"
+            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$DATASET_IDS" ]; then
+                echo "❌ OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, and DATASET_IDS are required"
                 exit 1
             fi
             
-            # Determine region and dataset IDs based on environment variables
-            if [ -n "$US_DATASET_IDS" ] && [ -n "$EU_DATASET_IDS" ]; then
-                echo "❌ Both US_DATASET_IDS and EU_DATASET_IDS are set. Please use only one."
-                exit 1
-            elif [ -n "$US_DATASET_IDS" ]; then
-                DATASET_IDS="$US_DATASET_IDS"
-                REGION="us-1"
-                echo "🇺🇸 Using US region with dataset IDs: $DATASET_IDS"
-            elif [ -n "$EU_DATASET_IDS" ]; then
-                DATASET_IDS="$EU_DATASET_IDS"
-                REGION="eu-1"
-                echo "🇪🇺 Using EU region with dataset IDs: $DATASET_IDS"
-            else
-                echo "❌ Either US_DATASET_IDS or EU_DATASET_IDS environment variable is required"
-                exit 1
-            fi
+            echo "🔧 Using dataset IDs: $DATASET_IDS"
             
             # Install required tools
             apk add --no-cache jq curl bc >/dev/null 2>&1 || {
@@ -182,14 +164,8 @@ class CLITools:
                 exit 1
             fi
             
-            # Use region-specific API endpoint
-            API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
-            echo "✅ Using region: $REGION"
-            
             # Build API URL with time parameters
-            API_URL="$API_BASE_URL/v1/meta/export/query"
             PARAMS=""
-            
             if [ -n "$interval" ]; then
                 PARAMS="interval=$interval"
             fi
@@ -210,26 +186,59 @@ class CLITools:
                 fi
             fi
             
-            if [ -n "$PARAMS" ]; then
-                API_URL="$API_URL?$PARAMS"
-            fi
-            
             echo "🚀 Executing OPAL query..."
             echo ""
             
             # Track query start time for performance monitoring
             START_TIME=$(date +%s)
             
-            # Execute query (simplified like the successful version)
-            RESPONSE=$(curl -s "$API_URL" \
-                --request POST \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                --header "Content-Type: application/json" \
-                --header "Accept: application/x-ndjson" \
-                --data "$QUERY_JSON")
+            # Try both regions - one will work, one will fail
+            RESPONSE=""
+            REGION_USED=""
+            
+            for REGION in "us-1" "eu-1"; do
+                echo "🔍 Trying $REGION region..."
+                API_BASE_URL="https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com"
+                API_URL="$API_BASE_URL/v1/meta/export/query"
+                
+                if [ -n "$PARAMS" ]; then
+                    API_URL="$API_URL?$PARAMS"
+                fi
+                
+                RESPONSE=$(curl -s --max-time 60 \
+                    "$API_URL" \
+                    --request POST \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" \
+                    --header "Accept: application/x-ndjson" \
+                    --data "$QUERY_JSON" 2>/dev/null)
+                
+                # Check if the response is successful (contains data or is valid JSON without major errors)
+                if [ -n "$RESPONSE" ] && echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
+                    # Check if it's an error response
+                    if echo "$RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
+                        echo "❌ $REGION region failed with error"
+                        continue
+                    else
+                        REGION_USED="$REGION"
+                        echo "✅ $REGION region succeeded"
+                        break
+                    fi
+                else
+                    echo "❌ $REGION region failed"
+                fi
+            done
             
             END_TIME=$(date +%s)
             QUERY_DURATION=$((END_TIME - START_TIME))
+            
+            if [ -z "$REGION_USED" ]; then
+                echo "❌ Failed to execute query in both US and EU regions"
+                echo "💡 Verify your dataset IDs are correct and you have access to them"
+                exit 1
+            fi
+            
+            echo "🌍 Using region: $REGION_USED"
             
             # Process response (same as successful version)
             if echo "$RESPONSE" | jq empty >/dev/null 2>&1; then
@@ -407,7 +416,7 @@ class CLITools:
         """Analyze dataset structure, performance, and optimization opportunities."""
         return ObserveCLITool(
             name="observe_dataset_analyzer", 
-            description="Deep analysis of dataset structure, field distribution, performance metrics, and optimization recommendations. Uses region-specific endpoints. Provides insights for better query performance.",
+            description="Deep analysis of dataset structure, field distribution, performance metrics, and optimization recommendations. Tries both US and EU regional endpoints. Provides insights for better query performance.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -419,42 +428,47 @@ class CLITools:
                 exit 1
             fi
             
-            # Determine region based on environment variables
-            if [ -n "$US_DATASET_IDS" ] && [ -n "$EU_DATASET_IDS" ]; then
-                echo "❌ Both US_DATASET_IDS and EU_DATASET_IDS are set. Please use only one."
-                exit 1
-            elif [ -n "$US_DATASET_IDS" ]; then
-                REGION="us-1"
-                echo "🇺🇸 Using US region for dataset analysis"
-            elif [ -n "$EU_DATASET_IDS" ]; then
-                REGION="eu-1"  
-                echo "🇪🇺 Using EU region for dataset analysis"
-            else
-                # Default to EU if no region variables are set (backward compatibility)
-                REGION="eu-1"
-                echo "⚠️  No region environment variables set, defaulting to EU region"
-                echo "💡 Set US_DATASET_IDS or EU_DATASET_IDS for explicit region selection"
-            fi
-            
             echo "🔬 Dataset Analysis Report"
             echo "========================="
             echo "Dataset ID: $dataset_id"
-            echo "Region: $REGION"
             echo "Timestamp: $(date)"
             echo ""
             
-            # Get dataset metadata
+            # Try both regions to get dataset metadata
             echo "📊 Fetching dataset metadata..."
-            DATASET_INFO=$(curl -s --max-time 30 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset/$dataset_id" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                --header "Content-Type: application/json" 2>/dev/null)
+            DATASET_INFO=""
+            REGION_USED=""
             
-            if [ $? -ne 0 ]; then
-                echo "❌ Failed to fetch dataset metadata"
-                echo "💡 Verify dataset ID exists in $REGION region"
+            for REGION in "us-1" "eu-1"; do
+                echo "🔍 Trying $REGION region..."
+                DATASET_INFO=$(curl -s --max-time 30 --fail \
+                    "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset/$dataset_id" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" 2>/dev/null)
+                
+                if [ $? -eq 0 ] && [ -n "$DATASET_INFO" ] && echo "$DATASET_INFO" | jq empty >/dev/null 2>&1; then
+                    # Check if it's an error response
+                    if echo "$DATASET_INFO" | jq -e '.error' >/dev/null 2>&1; then
+                        echo "❌ $REGION region failed with error"
+                        continue
+                    else
+                        REGION_USED="$REGION"
+                        echo "✅ $REGION region succeeded"
+                        break
+                    fi
+                else
+                    echo "❌ $REGION region failed"
+                fi
+            done
+            
+            if [ -z "$REGION_USED" ]; then
+                echo "❌ Failed to fetch dataset metadata from both US and EU regions"
+                echo "💡 Verify dataset ID exists and you have access to it"
                 exit 1
             fi
+            
+            echo "🌍 Using region: $REGION_USED"
+            echo ""
             
             # Basic dataset info
             echo "📋 Dataset Information:"
@@ -484,7 +498,7 @@ class CLITools:
                 }')
             
             SAMPLE_DATA=$(curl -s --max-time 30 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/meta/export/query" \
+                "https://$OBSERVE_CUSTOMER_ID.$REGION_USED.observeinc.com/v1/meta/export/query" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" \
                 --request POST \
@@ -570,7 +584,7 @@ class CLITools:
         """Monitor query performance and system health."""
         return ObserveCLITool(
             name="observe_performance_monitor",
-            description="Monitor Observe API performance, track query execution times, and provide system health insights. Uses region-specific endpoints. Includes performance benchmarking and optimization tracking.",
+            description="Monitor Observe API performance, track query execution times, and provide system health insights. Tries both US and EU regional endpoints. Includes performance benchmarking and optimization tracking.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -587,45 +601,48 @@ class CLITools:
                 exit 1
             fi
             
-            # Determine region based on environment variables
-            if [ -n "$US_DATASET_IDS" ] && [ -n "$EU_DATASET_IDS" ]; then
-                echo "❌ Both US_DATASET_IDS and EU_DATASET_IDS are set. Please use only one."
-                exit 1
-            elif [ -n "$US_DATASET_IDS" ]; then
-                REGION="us-1"
-                echo "🇺🇸 Using US region for performance monitoring"
-            elif [ -n "$EU_DATASET_IDS" ]; then
-                REGION="eu-1"  
-                echo "🇪🇺 Using EU region for performance monitoring"
-            else
-                # Default to EU if no region variables are set (backward compatibility)
-                REGION="eu-1"
-                echo "⚠️  No region environment variables set, defaulting to EU region"
-                echo "💡 Set US_DATASET_IDS or EU_DATASET_IDS for explicit region selection"
-            fi
-            
-            # API Health Check
+            # Try both regions for API health check
             echo ""
-            echo "🏥 API Health Check ($REGION):"
+            echo "🏥 API Health Check:"
             START_TIME=$(date +%s%3N)
             
-            HEALTH_RESPONSE=$(curl -s --max-time 10 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset?limit=1" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                --header "Content-Type: application/json" 2>/dev/null)
+            HEALTH_RESPONSE=""
+            REGION_USED=""
             
-            HEALTH_EXIT_CODE=$?
+            for REGION in "us-1" "eu-1"; do
+                echo "🔍 Trying $REGION region..."
+                HEALTH_RESPONSE=$(curl -s --max-time 10 --fail \
+                    "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/dataset?limit=1" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" 2>/dev/null)
+                
+                if [ $? -eq 0 ] && [ -n "$HEALTH_RESPONSE" ] && echo "$HEALTH_RESPONSE" | jq empty >/dev/null 2>&1; then
+                    # Check if it's an error response
+                    if echo "$HEALTH_RESPONSE" | jq -e '.error' >/dev/null 2>&1; then
+                        echo "❌ $REGION region failed with error"
+                        continue
+                    else
+                        REGION_USED="$REGION"
+                        echo "✅ $REGION region succeeded"
+                        break
+                    fi
+                else
+                    echo "❌ $REGION region failed"
+                fi
+            done
+            
             END_TIME=$(date +%s%3N)
             API_LATENCY=$((END_TIME - START_TIME))
             
-            if [ $HEALTH_EXIT_CODE -eq 0 ]; then
-                echo "✅ API Status: Healthy"
-                echo "⚡ Response Time: ${API_LATENCY}ms"
-            else
-                echo "❌ API Status: Unhealthy (exit code: $HEALTH_EXIT_CODE)"
-                echo "🔍 Check credentials and network connectivity"
+            if [ -z "$REGION_USED" ]; then
+                echo "❌ Failed to check API health in both US and EU regions"
+                echo "💡 Verify your credentials and network connectivity"
                 exit 1
             fi
+            
+            echo "🌍 Using region: $REGION_USED"
+            echo "✅ API Status: Healthy"
+            echo "⚡ Response Time: ${API_LATENCY}ms"
             
             # Performance benchmark if requested
             if [ "$run_benchmark" = "true" ]; then
@@ -653,7 +670,7 @@ class CLITools:
                             }')
                         
                         BENCHMARK_RESPONSE=$(curl -s --max-time 60 --fail \
-                            "https://$OBSERVE_CUSTOMER_ID.$REGION.observeinc.com/v1/meta/export/query" \
+                            "https://$OBSERVE_CUSTOMER_ID.$REGION_USED.observeinc.com/v1/meta/export/query" \
                             --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                             --header "Content-Type: application/json" \
                             --request POST \
@@ -706,8 +723,8 @@ class CLITools:
                 jq -n \
                     --arg timestamp "$(date -Iseconds)" \
                     --arg api_latency "$API_LATENCY" \
-                    --arg api_status "$HEALTH_EXIT_CODE" \
-                    --arg region "$REGION" \
+                    --arg api_status "0" \
+                    --arg region "$REGION_USED" \
                     '{
                         "timestamp": $timestamp,
                         "api_latency_ms": ($api_latency | tonumber),
