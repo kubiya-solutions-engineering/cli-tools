@@ -4,7 +4,13 @@ Test configuration and fixtures for observe_cli_tools tests.
 import pytest
 import json
 import os
+import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+# Add the observe_cli directory to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "observe_cli"))
+
 from observe_cli_tools.tools.base import ObserveCLITool
 from observe_cli_tools.tools.cli import CLITools
 

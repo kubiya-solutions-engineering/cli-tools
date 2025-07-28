@@ -14,7 +14,7 @@ def run_unit_tests():
     return pytest.main([
         "-v",
         "-m", "unit",
-        "tests/test_opal_query_construction.py"
+        "test_opal_query_construction.py"
     ])
 
 
@@ -23,7 +23,7 @@ def run_integration_tests():
     return pytest.main([
         "-v", 
         "-m", "integration",
-        "tests/test_integration.py"
+        "test_integration.py"
     ])
 
 
@@ -32,7 +32,7 @@ def run_performance_tests():
     return pytest.main([
         "-v",
         "-m", "performance", 
-        "tests/test_performance.py"
+        "test_performance.py"
     ])
 
 
@@ -40,10 +40,10 @@ def run_all_tests():
     """Run the complete test suite."""
     return pytest.main([
         "-v",
-        "--cov=observe_cli_tools",
+        "--cov=../observe_cli/observe_cli_tools",
         "--cov-report=term-missing",
         "--cov-report=html:htmlcov",
-        "tests/"
+        "."
     ])
 
 
@@ -69,16 +69,16 @@ def validate_test_environment():
     
     # Check test files exist
     test_files = [
-        'tests/test_opal_query_construction.py',
-        'tests/test_integration.py', 
-        'tests/test_pagination_and_errors.py',
-        'tests/test_performance.py',
-        'tests/conftest.py',
-        'tests/fixtures.py'
+        'test_opal_query_construction.py',
+        'test_integration.py', 
+        'test_pagination_and_errors.py',
+        'test_performance.py',
+        'conftest.py',
+        'fixtures.py'
     ]
     
     missing_files = []
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent
     
     for test_file in test_files:
         file_path = project_root / test_file
