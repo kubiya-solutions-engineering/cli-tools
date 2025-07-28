@@ -62,8 +62,8 @@ class CLITools:
             fi
             
             # Validate environment
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
-                echo "Error: OBSERVE_API_KEY and OBSERVE_CUSTOMER_ID are required"
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+                echo "Error: OBSERVE_API_KEYS and OBSERVE_CUSTOMER_ID are required"
                 exit 1
             fi
             
@@ -97,7 +97,7 @@ class CLITools:
                 # Execute API call with timeout and error handling
                 RESPONSE=$(curl -s --max-time 30 --fail \
                     "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?$QUERY_PARAMS" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEYS" \
                     --header "Content-Type: application/json" 2>/dev/null)
                 
                 # Cache the response
@@ -162,8 +162,8 @@ class CLITools:
             if ! command -v date >/dev/null 2>&1; then apk add --no-cache coreutils; fi
             
             # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, opal_query"
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
+                echo "❌ Missing required parameters: OBSERVE_API_KEYS, OBSERVE_CUSTOMER_ID, opal_query"
                 exit 1
             fi
             
@@ -244,7 +244,7 @@ class CLITools:
             
             RESPONSE=$(curl -s --max-time "$TIMEOUT" --fail \
                 --compressed \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEYS" \
                 --header "Content-Type: application/json" \
                 --header "Accept-Encoding: gzip" \
                 --request POST \
@@ -404,8 +404,8 @@ class CLITools:
             if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
             
             # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID"
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+                echo "❌ Missing required parameters: OBSERVE_API_KEYS, OBSERVE_CUSTOMER_ID"
                 exit 1
             fi
             
@@ -424,7 +424,7 @@ class CLITools:
             
             DATASET_INFO=$(curl -s --max-time 10 --fail \
                 "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$FIRST_DATASET" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEYS" \
                 --header "Content-Type: application/json" 2>/dev/null)
             
             if [ $? -eq 0 ] && [ -n "$DATASET_INFO" ]; then
@@ -451,7 +451,7 @@ class CLITools:
             
             SAMPLE_DATA=$(curl -s --max-time 30 --fail \
                 "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEYS" \
                 --header "Content-Type: application/json" \
                 --request POST \
                 --data "$SAMPLE_PAYLOAD" 2>/dev/null)
@@ -492,7 +492,7 @@ class CLITools:
             echo "Performance Monitor"
             
             # Validate connection
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
                 echo "❌ Missing credentials"
                 exit 1
             fi
@@ -502,7 +502,7 @@ class CLITools:
             
             HEALTH_RESPONSE=$(curl -s --max-time 5 --fail \
                 "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?limit=1" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEYS" \
                 --header "Content-Type: application/json" 2>/dev/null)
             
             HEALTH_EXIT_CODE=$?

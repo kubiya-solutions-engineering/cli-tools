@@ -112,7 +112,7 @@ graph LR
 ### 1️⃣ Configure Observe Connection
 
 ```bash
-export OBSERVE_API_KEY="your-api-token"
+export OBSERVE_API_KEYS="your-api-token"
 export OBSERVE_CUSTOMER_ID="your-customer-id"
 export OBSERVE_DATASET_ID="your-dataset-id"
 ```
