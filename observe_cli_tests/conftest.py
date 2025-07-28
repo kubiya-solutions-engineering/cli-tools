@@ -21,8 +21,7 @@ def mock_env():
     return {
         'OBSERVE_API_KEYS': '{"NA": "test_na_key_123456789", "EU": "test_eu_key_987654321"}',
         'OBSERVE_CUSTOMER_ID': 'test_customer_123',
-        'OBSERVE_DATASET_IDS': '41000001,41000002',
-        'DATASET_IDS': '41000001,41000002'
+        'OBSERVE_DATASET_IDS': '41000001,41000002'
     }
 
 

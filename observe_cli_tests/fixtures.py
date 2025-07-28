@@ -152,7 +152,7 @@ class MockData:
                 "code": 404,
                 "message": "The specified dataset ID does not exist or is not accessible",
                 "details": {
-                    "hint": "Verify dataset ID in DATASET_IDS environment variable"
+                    "hint": "Verify dataset ID in OBSERVE_DATASET_IDS environment variable"
                 }
             },
             "rate_limit": {
@@ -234,7 +234,7 @@ class MockEnvironments:
                 "EU": "test_eu_key_fedcba0987654321"
             }),
             'OBSERVE_CUSTOMER_ID': 'test_customer_123',
-            'DATASET_IDS': '41000001,41000002,41000003'
+            'OBSERVE_DATASET_IDS': '41000001,41000002,41000003'
         }
 
     @staticmethod
@@ -246,7 +246,7 @@ class MockEnvironments:
                 "EU": ""
             }),
             'OBSERVE_CUSTOMER_ID': 'test_customer_456',
-            'DATASET_IDS': '41000004'
+            'OBSERVE_DATASET_IDS': '41000004'
         }
 
     @staticmethod
@@ -254,7 +254,7 @@ class MockEnvironments:
         """Environment missing API keys."""
         return {
             'OBSERVE_CUSTOMER_ID': 'test_customer_789',
-            'DATASET_IDS': '41000005'
+            'OBSERVE_DATASET_IDS': '41000005'
         }
 
     @staticmethod
@@ -263,7 +263,7 @@ class MockEnvironments:
         return {
             'OBSERVE_API_KEYS': 'not-valid-json',
             'OBSERVE_CUSTOMER_ID': 'test_customer_999',
-            'DATASET_IDS': '41000006'
+            'OBSERVE_DATASET_IDS': '41000006'
         }
 
 

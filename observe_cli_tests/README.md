@@ -208,7 +208,7 @@ pytest -m "not slow"
 ```bash
 export OBSERVE_API_KEYS='{"NA": "test_key_na", "EU": "test_key_eu"}'
 export OBSERVE_CUSTOMER_ID="test_customer_123"  
-export DATASET_IDS="41000001,41000002"
+export OBSERVE_DATASET_IDS="41000001,41000002"
 ```
 
 ## Test Coverage Targets

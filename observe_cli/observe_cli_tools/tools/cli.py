@@ -169,10 +169,8 @@ class CLITools:
             
             # Handle dataset IDs
             if [ -n "$dataset_id" ]; then
-                DATASET_IDS="$dataset_id"
-            elif [ -n "$OBSERVE_DATASET_IDS" ]; then
-                DATASET_IDS="$OBSERVE_DATASET_IDS"
-            else
+                OBSERVE_DATASET_IDS="$dataset_id"
+            elif [ -z "$OBSERVE_DATASET_IDS" ]; then
                 echo "❌ No datasets available. Run observe_get_available_datasets first."
                 exit 1
             fi
@@ -192,7 +190,7 @@ class CLITools:
             
             # Build optimized payload with compression - support multiple datasets
             # Convert comma-separated dataset IDs to JSON array
-            DATASET_INPUTS=$(echo "$DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
+            DATASET_INPUTS=$(echo "$OBSERVE_DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
             
             QUERY_PAYLOAD=$(jq -n \
                 --argjson dataset_inputs "$DATASET_INPUTS" \
@@ -413,18 +411,16 @@ class CLITools:
             
             # Handle dataset IDs
             if [ -n "$dataset_id" ]; then
-                DATASET_IDS="$dataset_id"
-            elif [ -n "$OBSERVE_DATASET_IDS" ]; then
-                DATASET_IDS="$OBSERVE_DATASET_IDS"
-            else
+                OBSERVE_DATASET_IDS="$dataset_id"
+            elif [ -z "$OBSERVE_DATASET_IDS" ]; then
                 echo "❌ No datasets available. Run observe_get_available_datasets first."
                 exit 1
             fi
             
-            echo "Dataset Analysis: $DATASET_IDS"
+            echo "Dataset Analysis: $OBSERVE_DATASET_IDS"
             
             # Get first dataset for sample analysis
-            FIRST_DATASET=$(echo "$DATASET_IDS" | cut -d',' -f1 | xargs)
+            FIRST_DATASET=$(echo "$OBSERVE_DATASET_IDS" | cut -d',' -f1 | xargs)
             
             DATASET_INFO=$(curl -s --max-time 10 --fail \
                 "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$FIRST_DATASET" \
@@ -438,7 +434,7 @@ class CLITools:
             # Analyze field structure
             SAMPLE_QUERY='pick_col * | limit 3'
             
-            DATASET_INPUTS=$(echo "$DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
+            DATASET_INPUTS=$(echo "$OBSERVE_DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
             
             SAMPLE_PAYLOAD=$(jq -n \
                 --argjson dataset_inputs "$DATASET_INPUTS" \

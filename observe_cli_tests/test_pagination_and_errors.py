@@ -169,8 +169,8 @@ class TestErrorHandlingScenarios:
                 exit 1
             fi
             
-            if [ -z "$DATASET_IDS" ]; then
-                echo "❌ DATASET_IDS is required"
+            if [ -z "$OBSERVE_DATASET_IDS" ]; then
+                echo "❌ OBSERVE_DATASET_IDS is required"
                 exit 1
             fi
             

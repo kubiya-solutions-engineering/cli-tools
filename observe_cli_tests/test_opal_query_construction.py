@@ -281,7 +281,7 @@ class TestOPALQueryValidation:
             #!/bin/bash
             
             # Simulate environment validation
-            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$DATASET_IDS" ]; then
+            if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$OBSERVE_DATASET_IDS" ]; then
                 echo "Missing required environment variables"
                 exit 1
             fi
