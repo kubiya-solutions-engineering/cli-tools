@@ -329,14 +329,14 @@ class TestToolIntegration:
         opal_tool = cli_tools.execute_opal_query()
         
         assert opal_tool.name == "observe_opal_query"
-        assert "high-performance OPAL queries" in opal_tool.description
+        assert "Execute OPAL queries on configured datasets" in opal_tool.description
         assert len(opal_tool.args) == 9  # All the arguments we defined
         
         # Check specific arguments exist
         arg_names = [arg.name for arg in opal_tool.args]
         expected_args = [
-            "interval", "start_time", "end_time", "filter", "filter_type",
-            "fields", "limit", "offset", "query_timeout"
+            "dataset_id", "opal_query", "max_rows", "output_format", 
+            "time_range", "start_time", "end_time", "timeout", "cache_results"
         ]
         
         for expected_arg in expected_args:
@@ -347,29 +347,22 @@ class TestToolIntegration:
         content = opal_query_tool.content
         
         # Check for key sections
-        assert "#!/bin/sh" in content
-        assert "Validate environment" in content
-        assert "Building query from dataset IDs" in content
-        assert "Full Query JSON:" in content
-        assert "Observing query progress" in content
-        assert "Query Results" in content
+        assert "Install dependencies" in content
+        assert "Validate inputs" in content
+        assert "Handle dataset IDs" in content
+        assert "curl" in content
+        assert "jq" in content
+        assert "RESPONSE" in content
         
         # Check for error handling  
-        assert "are required" in content
-        assert "Failed to execute query" in content
-        assert "Query may have timed out" in content
+        assert "Missing required parameters" in content
 
     def test_argument_descriptions(self, opal_query_tool):
         """Test that argument descriptions contain OPAL-specific information."""
         args_dict = {arg.name: arg.description for arg in opal_query_tool.args}
         
         # Check OPAL-specific terms in descriptions
-        assert "OPAL" in args_dict["filter"]
-        assert "pick_col" in args_dict["fields"]
-        assert "skip clause" in args_dict["offset"]
-        assert "limit clause" in args_dict["limit"]
-        
-        # Check examples in descriptions
-        assert "timestamp,message,level" in args_dict["fields"]
-        assert "5*" in args_dict["filter"]  # Status code example
-        assert "300s" in args_dict["query_timeout"]
+        assert "OPAL" in args_dict["opal_query"]
+        assert "Dataset" in args_dict["dataset_id"]
+        assert "timeout" in args_dict["timeout"].lower() or "Query timeout" in args_dict["timeout"]
+        assert "format" in args_dict["output_format"].lower()

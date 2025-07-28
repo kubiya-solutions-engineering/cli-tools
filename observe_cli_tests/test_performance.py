@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import os
 from unittest.mock import patch, Mock
-from tests.fixtures import MockData, MockQueries, MockEnvironments
+from fixtures import MockData, MockQueries, MockEnvironments
 
 
 class TestQueryPerformance:

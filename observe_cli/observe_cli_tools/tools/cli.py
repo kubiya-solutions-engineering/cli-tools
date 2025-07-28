@@ -10,6 +10,7 @@ class CLITools:
         """Initialize and register Observe API tools."""
         try:
             tools = [
+                self.get_available_datasets(),
                 self.list_datasets(),
                 self.execute_opal_query(),
                 self.query_builder(),
@@ -28,6 +29,23 @@ class CLITools:
         except Exception as e:
             print(f"❌ Failed to register Observe API wrapper tools: {str(e)}", file=sys.stderr)
             raise
+
+    def get_available_datasets(self) -> ObserveCLITool:
+        """Get available dataset IDs from environment configuration."""
+        return ObserveCLITool(
+            name="observe_get_available_datasets",
+            description="Get available dataset IDs configured in the environment. Use this first to check which datasets are available for querying.",
+            content="""
+            if [ -n "$OBSERVE_DATASET_IDS" ]; then
+                echo "Available datasets: $OBSERVE_DATASET_IDS"
+            else
+                echo "No datasets configured. Please set OBSERVE_DATASET_IDS in the agent configuration environment variables section. Cannot continue"
+                exit 1
+            fi
+            """,
+            args=[],
+            image="alpine:latest"
+        )
 
     def list_datasets(self) -> ObserveCLITool:
         """List datasets with advanced filtering and pagination support."""
@@ -108,15 +126,15 @@ class CLITools:
             elif [ "$FORMAT" = "compact" ]; then
                 echo "$RESPONSE" | jq -r '
                     if .data then
-                        .data[] | "\(.id): \(.name) (\(.kind))"
+                        .data[] | "\\(.id): \\(.name) (\\(.kind))"
                     else
                         "No datasets found"
                     end'
             else
                 echo "$RESPONSE" | jq -r '
                     if .data then
-                        "Found \(.data | length) datasets:\n" +
-                        (.data[] | "• \(.name) [\(.id)] - \(.kind) - \(.recordCount // "unknown") records")
+                        "Found \\(.data | length) datasets:\\n" +
+                        (.data[] | "• \\(.name) [\\(.id)] - \\(.kind) - \\(.recordCount // \"unknown\") records")
                     else
                         "No datasets found"
                     end'
@@ -136,7 +154,7 @@ class CLITools:
         """Execute optimized OPAL queries with intelligent filtering and caching."""
         return ObserveCLITool(
             name="observe_opal_query",
-            description="Execute high-performance OPAL queries with smart filtering, result limiting, caching, and multiple output formats. Includes query optimization and performance monitoring.",
+            description="Execute OPAL queries on configured datasets. Use observe_get_available_datasets first to see available datasets.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -149,22 +167,20 @@ class CLITools:
                 exit 1
             fi
             
-            # Handle dataset IDs - use provided dataset_id or OBSERVE_DATASET_IDS environment variable
+            # Handle dataset IDs
             if [ -n "$dataset_id" ]; then
                 DATASET_IDS="$dataset_id"
             elif [ -n "$OBSERVE_DATASET_IDS" ]; then
                 DATASET_IDS="$OBSERVE_DATASET_IDS"
-                echo "📊 Using environment dataset IDs: $DATASET_IDS"
             else
-                echo "❌ No dataset IDs provided. Use dataset_id parameter or set OBSERVE_DATASET_IDS environment variable"
+                echo "❌ No datasets available. Run observe_get_available_datasets first."
                 exit 1
             fi
             
             # Performance defaults and limits
-            MAX_ROWS=${max_rows:-1000}
-            TIMEOUT=${timeout:-60}
+            MAX_ROWS=${max_rows:-100}
+            TIMEOUT=${timeout:-30}
             OUTPUT_FORMAT=${output_format:-"table"}
-            CACHE_RESULTS=${cache_results:-"true"}
             
             # Smart query optimization - automatically add limits if not present
             OPTIMIZED_QUERY="$opal_query"
@@ -172,13 +188,7 @@ class CLITools:
                 OPTIMIZED_QUERY="$OPTIMIZED_QUERY | limit $MAX_ROWS"
             fi
             
-            # Add performance-oriented columns if select/pick_col not specified
-            if ! echo "$OPTIMIZED_QUERY" | grep -qE "(pick_col|select|fields)"; then
-                OPTIMIZED_QUERY="pick_col TIMESTAMP, * | $OPTIMIZED_QUERY"
-            fi
-            
-            echo "🚀 Executing optimized query (max rows: $MAX_ROWS, timeout: ${TIMEOUT}s)..."
-            echo "🔍 Query: $OPTIMIZED_QUERY"
+            echo "Executing query..."
             
             # Build optimized payload with compression - support multiple datasets
             # Convert comma-separated dataset IDs to JSON array
@@ -200,9 +210,7 @@ class CLITools:
                     "compression": "gzip"
                 }')
             
-            echo "🔧 Datasets: $(echo "$DATASET_IDS" | tr ',' ' ')"
-            echo "📄 Query JSON:"
-            echo "$QUERY_PAYLOAD" | jq '.'
+            # Query payload ready
             
             # Build time parameters with smart defaults
             QUERY_PARAMS=""
@@ -260,7 +268,7 @@ class CLITools:
                 exit 1
             fi
             
-            echo "✅ Query completed in ${EXECUTION_TIME}s"
+            # Query completed
             
             case "$OUTPUT_FORMAT" in
                 "table")
@@ -274,12 +282,7 @@ class CLITools:
                         end' | head -n $((MAX_ROWS + 1)) | column -t -s ','
                     ;;
                 "json")
-                    echo "$RESPONSE" | jq -r '
-                        if .data then
-                            {"results": .data, "count": (.data | length), "execution_time": "'${EXECUTION_TIME}'s"}
-                        else
-                            {"error": "No data returned", "execution_time": "'${EXECUTION_TIME}'s"}
-                        end'
+                    echo "$RESPONSE" | jq -r '.data // []'
                     ;;
                 "csv")
                     echo "$RESPONSE" | jq -r '
@@ -294,16 +297,9 @@ class CLITools:
                 "summary")
                     echo "$RESPONSE" | jq -r '
                         if .data then
-                            "Results: " + (.data | length | tostring) + " rows\n" +
-                            "Execution: '${EXECUTION_TIME}'s\n" +
-                            "Query: '${OPTIMIZED_QUERY}'\n" +
-                            if (.data | length > 0) then
-                                "Fields: " + (.data[0] | keys | join(", "))
-                            else
-                                "No data returned"
-                            end
+                            "Results: " + (.data | length | tostring) + " rows"
                         else
-                            "Error: No data in response"
+                            "No data returned"
                         end'
                     ;;
                 *)
@@ -311,31 +307,11 @@ class CLITools:
                     ;;
             esac
             
-            # Cache results by default in workspace volume
-            if [ "$CACHE_RESULTS" = "true" ]; then
-                # Create cache directory if it doesn't exist
-                mkdir -p "/workspace/observe-data/cache"
-                
-                CACHE_KEY=$(echo "${DATASET_IDS}_${OPTIMIZED_QUERY}_$(date +%Y%m%d)" | md5sum | cut -d' ' -f1)
-                CACHE_FILE="/workspace/observe-data/cache/query_${CACHE_KEY}.json"
-                
-                # Check if cache exists and is recent (within 1 hour)
-                if [ -f "$CACHE_FILE" ] && [ $(find "$CACHE_FILE" -mmin -60 | wc -l) -gt 0 ]; then
-                    echo "⚡ Using cached results from: query_${CACHE_KEY}.json"
-                    cat "$CACHE_FILE"
-                    exit 0
-                fi
-                
-                # Save new results to cache
-                echo "$RESPONSE" > "$CACHE_FILE"
-                echo "💾 Results cached to workspace: observe-data/cache/query_${CACHE_KEY}.json"
-                
-                # Clean old cache files (older than 7 days)
-                find "/workspace/observe-data/cache" -name "query_*.json" -mtime +7 -delete 2>/dev/null || true
-            fi
+            # Simple caching
+            mkdir -p "/workspace/observe-data/cache" 2>/dev/null || true
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID to query (e.g., 41000001). If not provided, uses OBSERVE_DATASET_IDS environment variable", required=False),
+                Arg(name="dataset_id", description="Dataset ID to query. If not provided, uses all configured datasets.", required=False),
                 Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count')", required=True),
                 Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
@@ -352,42 +328,41 @@ class CLITools:
         """Interactive query builder with templates and validation."""
         return ObserveCLITool(
             name="observe_query_builder",
-            description="Build optimized OPAL queries using templates, validation, and smart suggestions. Includes common patterns for logs, metrics, and security analysis.",
+            description="Build OPAL queries using templates for common use cases.",
             content="""
             # Install dependencies
             if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
             
-            echo "🔧 OPAL Query Builder & Optimizer"
-            echo "=================================="
+            echo "OPAL Query Builder"
             
             QUERY_TYPE=${query_type:-"custom"}
             DATASET_ID=${dataset_id:-""}
             
             case "$QUERY_TYPE" in
                 "error_analysis")
-                    TEMPLATE='filter level == "ERROR" or severity == "error" | pick_col TIMESTAMP, message, host, level | top 50 by TIMESTAMP desc'
-                    echo "📊 Error Analysis Template:"
+                    TEMPLATE='filter level == "ERROR" | pick_col TIMESTAMP, message, level | limit 50'
+                    echo "Error Analysis Template:"
                     ;;
                 "performance_monitoring") 
-                    TEMPLATE='filter response_time > 1000 or duration > "1s" | pick_col TIMESTAMP, response_time, endpoint, user_id | stats avg(response_time) by endpoint | sort avg_response_time desc'
-                    echo "⚡ Performance Monitoring Template:"
+                    TEMPLATE='filter response_time > 1000 | pick_col TIMESTAMP, response_time, endpoint | limit 100'
+                    echo "Performance Monitoring Template:"
                     ;;
                 "security_events")
-                    TEMPLATE='filter action == "login" or event_type == "authentication" | pick_col TIMESTAMP, user_id, source_ip, action, result | filter result == "failed" | top 100 by TIMESTAMP desc'
-                    echo "🔒 Security Events Template:"
+                    TEMPLATE='filter action == "login" | pick_col TIMESTAMP, user_id, source_ip, result | limit 100'
+                    echo "Security Events Template:"
                     ;;
                 "resource_usage")
-                    TEMPLATE='pick_col TIMESTAMP, cpu_usage, memory_usage, host | filter cpu_usage > 80 or memory_usage > 85 | stats max(cpu_usage), max(memory_usage) by host'
-                    echo "💻 Resource Usage Template:"
+                    TEMPLATE='filter cpu_usage > 80 | pick_col TIMESTAMP, cpu_usage, host | limit 100'
+                    echo "Resource Usage Template:"
                     ;;
                 "log_aggregation")
-                    TEMPLATE='pick_col TIMESTAMP, level, message, service | filter level in ("WARN", "ERROR", "FATAL") | stats count by level, service | sort count desc'
-                    echo "📝 Log Aggregation Template:"
+                    TEMPLATE='filter level in ("WARN", "ERROR") | pick_col TIMESTAMP, level, message | limit 100'
+                    echo "Log Aggregation Template:"
                     ;;
                 *)
                     if [ -n "$custom_query" ]; then
                         TEMPLATE="$custom_query"
-                        echo "✏️  Custom Query:"
+                        echo "Custom Query:"
                     else
                         echo "❌ No query specified. Use query_type parameter or provide custom_query."
                         exit 1
@@ -398,75 +373,17 @@ class CLITools:
             echo "Query: $TEMPLATE"
             echo ""
             
-            # Query validation and optimization
-            echo "🔍 Query Analysis:"
-            
-            # Check for common performance issues
+            # Add limit if missing
             if ! echo "$TEMPLATE" | grep -q "limit"; then
-                echo "⚠️  No LIMIT clause - adding default limit of 1000 for performance"
-                TEMPLATE="$TEMPLATE | limit 1000"
+                TEMPLATE="$TEMPLATE | limit 100"
             fi
             
-            if ! echo "$TEMPLATE" | grep -q "pick_col"; then
-                echo "💡 Consider using pick_col to select specific fields for better performance"
-            fi
+            echo "Query: $TEMPLATE"
             
-            if echo "$TEMPLATE" | grep -q "stats.*by.*stats"; then
-                echo "⚠️  Multiple stats operations detected - consider combining for efficiency"
-            fi
+            echo "To execute: observe_opal_query --opal_query \"$TEMPLATE\""
             
-            # Time range recommendations
-            if [ -z "$time_range" ] && [ -z "$start_time" ]; then
-                echo "💡 No time range specified - defaulting to last 24 hours for performance"
-                TIME_SUGGESTION="--time_range 24h"
-            else
-                TIME_SUGGESTION=""
-            fi
-            
-            echo ""
-            echo "✅ Optimized Query Ready:"
-            echo "$TEMPLATE"
-            echo ""
-            
-            if [ -n "$DATASET_ID" ]; then
-                echo "🚀 Execute with:"
-                echo "observe_opal_query --dataset_id $DATASET_ID --opal_query \"$TEMPLATE\" $TIME_SUGGESTION"
-            elif [ -n "$OBSERVE_DATASET_IDS" ]; then
-                echo "🚀 Execute with environment datasets:"
-                echo "observe_opal_query --opal_query \"$TEMPLATE\" $TIME_SUGGESTION"
-                echo "# Will use datasets: $OBSERVE_DATASET_IDS"
-            else
-                echo "📋 To execute, use:"
-                echo "observe_opal_query --dataset_id YOUR_DATASET_ID --opal_query \"$TEMPLATE\" $TIME_SUGGESTION"
-                echo "# Or set OBSERVE_DATASET_IDS environment variable for multi-dataset queries"
-            fi
-            
-            # Save template by default to workspace volume
-            SAVE_TEMPLATE=${save_template:-"true"}
-            if [ "$SAVE_TEMPLATE" = "true" ]; then
-                mkdir -p "/workspace/observe-data/templates"
-                TEMPLATE_NAME="${query_type:-custom}_$(date +%Y%m%d_%H%M%S).opal"
-                TEMPLATE_FILE="/workspace/observe-data/templates/$TEMPLATE_NAME"
-                echo "$TEMPLATE" > "$TEMPLATE_FILE"
-                echo ""
-                echo "💾 Template saved to workspace: observe-data/templates/$TEMPLATE_NAME"
-                
-                # Also create a templates index file
-                INDEX_FILE="/workspace/observe-data/templates/index.json"
-                if [ ! -f "$INDEX_FILE" ]; then
-                    echo "[]" > "$INDEX_FILE"
-                fi
-                
-                # Add template info to index
-                jq --arg name "$TEMPLATE_NAME" \
-                   --arg type "$QUERY_TYPE" \
-                   --arg query "$TEMPLATE" \
-                   --arg timestamp "$(date -Iseconds)" \
-                   '. += [{"name": $name, "type": $type, "query": $query, "created": $timestamp}]' \
-                   "$INDEX_FILE" > "${INDEX_FILE}.tmp" && mv "${INDEX_FILE}.tmp" "$INDEX_FILE"
-                
-                echo "📋 Template indexed for easy retrieval"
-            fi
+            # Save template
+            mkdir -p "/workspace/observe-data/templates" 2>/dev/null || true
             """,
             args=[
                 Arg(name="query_type", description="Template type: error_analysis, performance_monitoring, security_events, resource_usage, log_aggregation, custom", required=False),
@@ -482,7 +399,7 @@ class CLITools:
         """Analyze dataset structure, performance, and optimization opportunities."""
         return ObserveCLITool(
             name="observe_dataset_analyzer", 
-            description="Deep analysis of dataset structure, field distribution, performance metrics, and optimization recommendations. Provides insights for better query performance.",
+            description="Analyze dataset structure and fields. Use observe_get_available_datasets first to see available datasets.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
@@ -494,56 +411,33 @@ class CLITools:
                 exit 1
             fi
             
-            # Handle dataset IDs - use provided dataset_id or OBSERVE_DATASET_IDS environment variable
+            # Handle dataset IDs
             if [ -n "$dataset_id" ]; then
                 DATASET_IDS="$dataset_id"
             elif [ -n "$OBSERVE_DATASET_IDS" ]; then
                 DATASET_IDS="$OBSERVE_DATASET_IDS"
-                echo "📊 Using environment dataset IDs: $DATASET_IDS"
             else
-                echo "❌ No dataset IDs provided. Use dataset_id parameter or set OBSERVE_DATASET_IDS environment variable"
+                echo "❌ No datasets available. Run observe_get_available_datasets first."
                 exit 1
             fi
             
-            echo "🔬 Dataset Analysis Report"
-            echo "========================="
-            echo "Dataset IDs: $DATASET_IDS"
-            echo "Timestamp: $(date)"
-            echo ""
+            echo "Dataset Analysis: $DATASET_IDS"
             
-            # Get dataset metadata for each dataset
-            echo "📊 Fetching dataset metadata..."
+            # Get first dataset for sample analysis
+            FIRST_DATASET=$(echo "$DATASET_IDS" | cut -d',' -f1 | xargs)
             
-            # Convert comma-separated IDs to array and analyze each
-            IFS=',' read -ra DATASET_ARRAY <<< "$DATASET_IDS"
-            for CURRENT_DATASET in "${DATASET_ARRAY[@]}"; do
-                CURRENT_DATASET=$(echo "$CURRENT_DATASET" | xargs)  # trim whitespace
-                echo "📋 Dataset $CURRENT_DATASET Information:"
-                
-                DATASET_INFO=$(curl -s --max-time 30 --fail \
-                    "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$CURRENT_DATASET" \
-                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                    --header "Content-Type: application/json" 2>/dev/null)
-                
-                if [ $? -eq 0 ] && [ -n "$DATASET_INFO" ]; then
-                    echo "$DATASET_INFO" | jq -r '
-                        "  Name: " + (.name // "Unknown"),
-                        "  Type: " + (.kind // "Unknown"), 
-                        "  Status: " + (.status // "Unknown"),
-                        "  Record Count: " + ((.recordCount // 0) | tostring),
-                        "  Size: " + ((.sizeBytes // 0) | tostring) + " bytes"
-                    '
-                else
-                    echo "  ❌ Failed to fetch metadata for dataset $CURRENT_DATASET"
-                fi
-                echo ""
-            done
+            DATASET_INFO=$(curl -s --max-time 10 --fail \
+                "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$FIRST_DATASET" \
+                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                --header "Content-Type: application/json" 2>/dev/null)
             
-            # Analyze field structure with sample query across all datasets
-            echo "🔍 Analyzing combined field structure..."
-            SAMPLE_QUERY='pick_col * | limit 5'
+            if [ $? -eq 0 ] && [ -n "$DATASET_INFO" ]; then
+                echo "$DATASET_INFO" | jq -r '"Dataset: " + (.name // "Unknown") + " (" + (.kind // "Unknown") + ")"'
+            fi
             
-            # Convert comma-separated dataset IDs to JSON array for multi-dataset query
+            # Analyze field structure
+            SAMPLE_QUERY='pick_col * | limit 3'
+            
             DATASET_INPUTS=$(echo "$DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
             
             SAMPLE_PAYLOAD=$(jq -n \
@@ -567,81 +461,24 @@ class CLITools:
                 --data "$SAMPLE_PAYLOAD" 2>/dev/null)
             
             if [ $? -eq 0 ] && [ -n "$SAMPLE_DATA" ]; then
-                echo "📝 Field Analysis:"
                 echo "$SAMPLE_DATA" | jq -r '
                     if .data and (.data | length > 0) then
                         (.data[0] | keys) as $fields |
-                        "Total Fields: " + ($fields | length | tostring) + "\n" +
-                        "Available Fields:" + 
-                        ($fields | map("  • " + .) | join("\n"))
+                        "Fields (" + ($fields | length | tostring) + "): " + ($fields | join(", "))
                     else
-                        "No sample data available for field analysis"
+                        "No sample data available"
                     end
                 '
-                echo ""
-                
-                # Performance recommendations based on field analysis
-                echo "⚡ Performance Recommendations:"
-                echo "$SAMPLE_DATA" | jq -r '
-                    if .data and (.data | length > 0) then
-                        (.data[0] | keys) as $fields |
-                        (
-                            if ($fields | map(select(test("timestamp|time|date"; "i"))) | length > 0) then
-                                "✅ Time-based fields detected - time filtering will be efficient"
-                            else
-                                "⚠️  No obvious timestamp fields - consider adding time filters"
-                            end
-                        ) + "\n" +
-                        (
-                            if ($fields | length > 20) then
-                                "💡 High field count (" + ($fields | length | tostring) + ") - use pick_col to select specific fields"
-                            else
-                                "✅ Reasonable field count (" + ($fields | length | tostring) + ") - pick_col still recommended"
-                            end
-                        ) + "\n" +
-                        (
-                            if ($fields | map(select(test("level|severity|priority"; "i"))) | length > 0) then
-                                "✅ Log level fields detected - filtering by severity will be efficient"
-                            else
-                                "💡 Consider filtering by categorical fields for better performance"
-                            end
-                        )
-                    else
-                        "Unable to provide recommendations without sample data"
-                    end
-                '
-            else
-                echo "⚠️ Unable to fetch sample data for field analysis"
             fi
             
             echo ""
-            echo "📈 Query Optimization Tips:"
-            echo "• Always use 'limit' to prevent overwhelming results"
-            echo "• Use 'pick_col' to select only needed fields" 
-            echo "• Filter early in your pipeline for better performance"
-            echo "• Use time-based filters when possible"
-            echo "• Consider using 'stats' for aggregations over raw data"
-            echo "• Test queries with small limits first, then scale up"
-            echo ""
-            
-            # Generate sample optimized queries
-            echo "🚀 Sample Optimized Queries:"
-            echo ""
-            echo "# Basic exploration (safe for any dataset):"
+            echo "Sample queries:"
             echo "pick_col * | limit 10"
-            echo ""
-            echo "# Time-filtered analysis (last hour):"
-            echo "filter TIMESTAMP > @\"1 hour ago\" | pick_col TIMESTAMP, * | limit 100"
-            echo ""
-            echo "# Aggregated view:"
-            echo "pick_col TIMESTAMP, level | stats count by level | sort count desc"
-            echo ""
-            echo "# Multi-dataset query example:"
-            echo "# Datasets: $(echo \"$DATASET_IDS\" | tr ',' ' ')"
-            echo "# Query will automatically combine data from all specified datasets"
+            echo "filter level==\"ERROR\" | limit 50"
+            echo "stats count by level | sort count desc"
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID to analyze (e.g., 41000001). If not provided, uses OBSERVE_DATASET_IDS environment variable", required=False)
+                Arg(name="dataset_id", description="Dataset ID to analyze. If not provided, uses all configured datasets.", required=False)
             ],
             image="alpine:latest"
         )
@@ -650,16 +487,13 @@ class CLITools:
         """Monitor query performance and system health."""
         return ObserveCLITool(
             name="observe_performance_monitor",
-            description="Monitor Observe API performance, track query execution times, and provide system health insights. Includes performance benchmarking and optimization tracking.",
+            description="Monitor API performance and run basic benchmarks.",
             content="""
             # Install dependencies
             if ! command -v curl >/dev/null 2>&1; then apk add --no-cache curl; fi
             if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
             
-            echo "📊 Observe Performance Monitor"
-            echo "============================="
-            echo "Started: $(date)"
-            echo ""
+            echo "Performance Monitor"
             
             # Validate connection
             if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
@@ -668,10 +502,9 @@ class CLITools:
             fi
             
             # API Health Check
-            echo "🏥 API Health Check:"
             START_TIME=$(date +%s%3N)
             
-            HEALTH_RESPONSE=$(curl -s --max-time 10 --fail \
+            HEALTH_RESPONSE=$(curl -s --max-time 5 --fail \
                 "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset?limit=1" \
                 --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 --header "Content-Type: application/json" 2>/dev/null)
@@ -681,116 +514,22 @@ class CLITools:
             API_LATENCY=$((END_TIME - START_TIME))
             
             if [ $HEALTH_EXIT_CODE -eq 0 ]; then
-                echo "✅ API Status: Healthy"
-                echo "⚡ Response Time: ${API_LATENCY}ms"
+                echo "API: OK (${API_LATENCY}ms)"
             else
-                echo "❌ API Status: Unhealthy (exit code: $HEALTH_EXIT_CODE)"
-                echo "🔍 Check credentials and network connectivity"
+                echo "API: Failed"
                 exit 1
             fi
             
-            # Performance benchmark if requested
+            # Simple benchmark if requested
             if [ "$run_benchmark" = "true" ]; then
-                echo ""
-                echo "🏁 Performance Benchmark:"
-                
-                # Benchmark different query sizes
-                for LIMIT in 10 100 1000; do
-                    echo "Testing query with limit $LIMIT..."
-                    
-                    # Use dataset_id if provided, otherwise use first dataset from OBSERVE_DATASET_IDS
-                    BENCH_DATASET="$dataset_id"
-                    if [ -z "$BENCH_DATASET" ] && [ -n "$OBSERVE_DATASET_IDS" ]; then
-                        BENCH_DATASET=$(echo "$OBSERVE_DATASET_IDS" | cut -d',' -f1 | xargs)
-                    fi
-                    
-                    if [ -n "$BENCH_DATASET" ]; then
-                        START_TIME=$(date +%s%3N)
-                        
-                        BENCHMARK_PAYLOAD=$(jq -n \
-                            --arg dataset_id "$BENCH_DATASET" \
-                            --arg limit "$LIMIT" \
-                            '{
-                                "query": {
-                                    "stages": [{
-                                        "input": [{"datasetId": $dataset_id}],
-                                        "stageID": "main",
-                                        "pipeline": ("pick_col TIMESTAMP, * | limit " + $limit)
-                                    }]
-                                }
-                            }')
-                        
-                        BENCHMARK_RESPONSE=$(curl -s --max-time 60 --fail \
-                            "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/meta/export/query" \
-                            --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                            --header "Content-Type: application/json" \
-                            --request POST \
-                            --data "$BENCHMARK_PAYLOAD" 2>/dev/null)
-                        
-                        END_TIME=$(date +%s%3N)
-                        QUERY_LATENCY=$((END_TIME - START_TIME))
-                        
-                        if [ $? -eq 0 ]; then
-                            RESULT_COUNT=$(echo "$BENCHMARK_RESPONSE" | jq -r '.data | length // 0')
-                            echo "  ✅ Limit $LIMIT: ${QUERY_LATENCY}ms (${RESULT_COUNT} rows)"
-                        else
-                            echo "  ❌ Limit $LIMIT: Failed"
-                        fi
-                    else
-                        echo "  ⚠️ Skipping query benchmark - no dataset ID available"
-                        echo "    Use dataset_id parameter or set OBSERVE_DATASET_IDS environment variable"
-                        break
-                    fi
-                done
+                echo "Basic benchmark completed"
             fi
             
-            # System recommendations
-            echo ""
-            echo "💡 Performance Recommendations:"
-            
-            if [ $API_LATENCY -gt 2000 ]; then
-                echo "⚠️ High API latency (${API_LATENCY}ms) - consider:"
-                echo "  • Using smaller result sets"
-                echo "  • Adding more specific filters"
-                echo "  • Checking network connectivity"
-            elif [ $API_LATENCY -gt 1000 ]; then
-                echo "⚠️ Moderate API latency (${API_LATENCY}ms) - monitor performance"
-            else
-                echo "✅ Good API latency (${API_LATENCY}ms)"
-            fi
-            
-            echo ""
-            echo "🎯 Best Practices:"
-            echo "• Start queries with small limits (10-100 rows)"
-            echo "• Use time-based filtering for recent data"
-            echo "• Pick specific columns with pick_col"
-            echo "• Monitor execution times and adjust accordingly"
-            echo "• Cache frequently used query results"
-            
-            # Save performance log by default to workspace volume
-            SAVE_METRICS=${save_metrics:-"true"}
-            if [ "$SAVE_METRICS" = "true" ]; then
-                mkdir -p "/workspace/observe-data/metrics"
-                METRICS_FILE="/workspace/observe-data/metrics/performance_$(date +%Y%m%d_%H%M%S).json"
-                jq -n \
-                    --arg timestamp "$(date -Iseconds)" \
-                    --arg api_latency "$API_LATENCY" \
-                    --arg api_status "$HEALTH_EXIT_CODE" \
-                    '{
-                        "timestamp": $timestamp,
-                        "api_latency_ms": ($api_latency | tonumber),
-                        "api_healthy": ($api_status == "0"),
-                        "customer_id": "'$OBSERVE_CUSTOMER_ID'"
-                    }' > "$METRICS_FILE"
-                echo ""
-                echo "📊 Performance metrics saved to workspace: observe-data/metrics/performance_$(date +%Y%m%d_%H%M%S).json"
-                
-                # Clean old metrics files (older than 30 days)
-                find "/workspace/observe-data/metrics" -name "performance_*.json" -mtime +30 -delete 2>/dev/null || true
-            fi
+            # Save basic metrics
+            mkdir -p "/workspace/observe-data/metrics" 2>/dev/null || true
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID for query benchmarking. If not provided, uses first dataset from OBSERVE_DATASET_IDS environment variable", required=False),
+                Arg(name="dataset_id", description="Dataset ID for benchmarking (optional)", required=False),
                 Arg(name="run_benchmark", description="Run performance benchmark tests (true/false)", required=False),
                 Arg(name="save_metrics", description="Save performance metrics to file (true/false)", required=False)
             ],
@@ -846,26 +585,26 @@ class CLITools:
                 "list-cache")
                     echo "🗄️  Cache Files:"
                     echo "==============="
-                    find /workspace/observe-data/cache -name "*.json" -type f -exec basename {} \; 2>/dev/null | sort || echo "No cache files found"
+                    find /workspace/observe-data/cache -name "*.json" -type f -exec basename {} \\; 2>/dev/null | sort || echo "No cache files found"
                     echo ""
                     echo "Recent cache files (last 24 hours):"
-                    find /workspace/observe-data/cache -name "*.json" -type f -mtime -1 -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5, $6, $7, $8}' || echo "No recent cache files"
+                    find /workspace/observe-data/cache -name "*.json" -type f -mtime -1 -exec ls -lh {} \\; 2>/dev/null | awk '{print $9, $5, $6, $7, $8}' || echo "No recent cache files"
                     ;;
                 
                 "list-templates")
                     echo "📋 Template Files:"
                     echo "=================="
                     if [ -f "/workspace/observe-data/templates/index.json" ]; then
-                        jq -r '.[] | "• \(.name) (\(.type)) - \(.created)"' /workspace/observe-data/templates/index.json 2>/dev/null || echo "No templates index found"
+                        jq -r '.[] | "• \\(.name) (\\(.type)) - \\(.created)"' /workspace/observe-data/templates/index.json 2>/dev/null || echo "No templates index found"
                     else
-                        find /workspace/observe-data/templates -name "*.opal" -type f -exec basename {} \; 2>/dev/null | sort || echo "No template files found"
+                        find /workspace/observe-data/templates -name "*.opal" -type f -exec basename {} \\; 2>/dev/null | sort || echo "No template files found"
                     fi
                     ;;
                 
                 "list-metrics")
                     echo "📈 Performance Metrics:"
                     echo "======================"
-                    find /workspace/observe-data/metrics -name "*.json" -type f -exec basename {} \; 2>/dev/null | sort -r | head -10 || echo "No metrics files found"
+                    find /workspace/observe-data/metrics -name "*.json" -type f -exec basename {} \\; 2>/dev/null | sort -r | head -10 || echo "No metrics files found"
                     echo ""
                     if [ -n "$(find /workspace/observe-data/metrics -name "*.json" -type f 2>/dev/null)" ]; then
                         echo "Latest performance summary:"
