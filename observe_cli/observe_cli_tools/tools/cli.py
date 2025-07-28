@@ -144,8 +144,19 @@ class CLITools:
             if ! command -v date >/dev/null 2>&1; then apk add --no-cache coreutils; fi
             
             # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$dataset_id" ] || [ -z "$opal_query" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, dataset_id, opal_query"
+            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$opal_query" ]; then
+                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, opal_query"
+                exit 1
+            fi
+            
+            # Handle dataset IDs - use provided dataset_id or OBSERVE_DATASET_IDS environment variable
+            if [ -n "$dataset_id" ]; then
+                DATASET_IDS="$dataset_id"
+            elif [ -n "$OBSERVE_DATASET_IDS" ]; then
+                DATASET_IDS="$OBSERVE_DATASET_IDS"
+                echo "📊 Using environment dataset IDs: $DATASET_IDS"
+            else
+                echo "❌ No dataset IDs provided. Use dataset_id parameter or set OBSERVE_DATASET_IDS environment variable"
                 exit 1
             fi
             
@@ -169,14 +180,17 @@ class CLITools:
             echo "🚀 Executing optimized query (max rows: $MAX_ROWS, timeout: ${TIMEOUT}s)..."
             echo "🔍 Query: $OPTIMIZED_QUERY"
             
-            # Build optimized payload with compression
+            # Build optimized payload with compression - support multiple datasets
+            # Convert comma-separated dataset IDs to JSON array
+            DATASET_INPUTS=$(echo "$DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
+            
             QUERY_PAYLOAD=$(jq -n \
-                --arg dataset_id "$dataset_id" \
+                --argjson dataset_inputs "$DATASET_INPUTS" \
                 --arg pipeline "$OPTIMIZED_QUERY" \
                 '{
                     "query": {
                         "stages": [{
-                            "input": [{"datasetId": $dataset_id}],
+                            "input": $dataset_inputs,
                             "stageID": "main",
                             "pipeline": $pipeline
                         }]
@@ -185,6 +199,10 @@ class CLITools:
                     "format": "json",
                     "compression": "gzip"
                 }')
+            
+            echo "🔧 Datasets: $(echo "$DATASET_IDS" | tr ',' ' ')"
+            echo "📄 Query JSON:"
+            echo "$QUERY_PAYLOAD" | jq '.'
             
             # Build time parameters with smart defaults
             QUERY_PARAMS=""
@@ -298,7 +316,7 @@ class CLITools:
                 # Create cache directory if it doesn't exist
                 mkdir -p "/workspace/observe-data/cache"
                 
-                CACHE_KEY=$(echo "${dataset_id}_${OPTIMIZED_QUERY}_$(date +%Y%m%d)" | md5sum | cut -d' ' -f1)
+                CACHE_KEY=$(echo "${DATASET_IDS}_${OPTIMIZED_QUERY}_$(date +%Y%m%d)" | md5sum | cut -d' ' -f1)
                 CACHE_FILE="/workspace/observe-data/cache/query_${CACHE_KEY}.json"
                 
                 # Check if cache exists and is recent (within 1 hour)
@@ -317,7 +335,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID to query (e.g., 41000001)", required=True),
+                Arg(name="dataset_id", description="Dataset ID to query (e.g., 41000001). If not provided, uses OBSERVE_DATASET_IDS environment variable", required=False),
                 Arg(name="opal_query", description="OPAL query pipeline (e.g., 'filter level==\"ERROR\" | top 10 by count')", required=True),
                 Arg(name="max_rows", description="Maximum rows to return (default: 1000, helps prevent overwhelming output)", required=False),
                 Arg(name="output_format", description="Output format: table, json, csv, summary (default: table)", required=False),
@@ -413,9 +431,14 @@ class CLITools:
             if [ -n "$DATASET_ID" ]; then
                 echo "🚀 Execute with:"
                 echo "observe_opal_query --dataset_id $DATASET_ID --opal_query \"$TEMPLATE\" $TIME_SUGGESTION"
+            elif [ -n "$OBSERVE_DATASET_IDS" ]; then
+                echo "🚀 Execute with environment datasets:"
+                echo "observe_opal_query --opal_query \"$TEMPLATE\" $TIME_SUGGESTION"
+                echo "# Will use datasets: $OBSERVE_DATASET_IDS"
             else
                 echo "📋 To execute, use:"
                 echo "observe_opal_query --dataset_id YOUR_DATASET_ID --opal_query \"$TEMPLATE\" $TIME_SUGGESTION"
+                echo "# Or set OBSERVE_DATASET_IDS environment variable for multi-dataset queries"
             fi
             
             # Save template by default to workspace volume
@@ -466,50 +489,70 @@ class CLITools:
             if ! command -v jq >/dev/null 2>&1; then apk add --no-cache jq; fi
             
             # Validate inputs
-            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$dataset_id" ]; then
-                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID, dataset_id"
+            if [ -z "$OBSERVE_API_KEY" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
+                echo "❌ Missing required parameters: OBSERVE_API_KEY, OBSERVE_CUSTOMER_ID"
+                exit 1
+            fi
+            
+            # Handle dataset IDs - use provided dataset_id or OBSERVE_DATASET_IDS environment variable
+            if [ -n "$dataset_id" ]; then
+                DATASET_IDS="$dataset_id"
+            elif [ -n "$OBSERVE_DATASET_IDS" ]; then
+                DATASET_IDS="$OBSERVE_DATASET_IDS"
+                echo "📊 Using environment dataset IDs: $DATASET_IDS"
+            else
+                echo "❌ No dataset IDs provided. Use dataset_id parameter or set OBSERVE_DATASET_IDS environment variable"
                 exit 1
             fi
             
             echo "🔬 Dataset Analysis Report"
             echo "========================="
-            echo "Dataset ID: $dataset_id"
+            echo "Dataset IDs: $DATASET_IDS"
             echo "Timestamp: $(date)"
             echo ""
             
-            # Get dataset metadata
+            # Get dataset metadata for each dataset
             echo "📊 Fetching dataset metadata..."
-            DATASET_INFO=$(curl -s --max-time 30 --fail \
-                "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$dataset_id" \
-                --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
-                --header "Content-Type: application/json" 2>/dev/null)
             
-            if [ $? -ne 0 ]; then
-                echo "❌ Failed to fetch dataset metadata"
-                exit 1
-            fi
+            # Convert comma-separated IDs to array and analyze each
+            IFS=',' read -ra DATASET_ARRAY <<< "$DATASET_IDS"
+            for CURRENT_DATASET in "${DATASET_ARRAY[@]}"; do
+                CURRENT_DATASET=$(echo "$CURRENT_DATASET" | xargs)  # trim whitespace
+                echo "📋 Dataset $CURRENT_DATASET Information:"
+                
+                DATASET_INFO=$(curl -s --max-time 30 --fail \
+                    "https://$OBSERVE_CUSTOMER_ID.eu-1.observeinc.com/v1/dataset/$CURRENT_DATASET" \
+                    --header "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
+                    --header "Content-Type: application/json" 2>/dev/null)
+                
+                if [ $? -eq 0 ] && [ -n "$DATASET_INFO" ]; then
+                    echo "$DATASET_INFO" | jq -r '
+                        "  Name: " + (.name // "Unknown"),
+                        "  Type: " + (.kind // "Unknown"), 
+                        "  Status: " + (.status // "Unknown"),
+                        "  Record Count: " + ((.recordCount // 0) | tostring),
+                        "  Size: " + ((.sizeBytes // 0) | tostring) + " bytes"
+                    '
+                else
+                    echo "  ❌ Failed to fetch metadata for dataset $CURRENT_DATASET"
+                fi
+                echo ""
+            done
             
-            # Basic dataset info
-            echo "📋 Dataset Information:"
-            echo "$DATASET_INFO" | jq -r '
-                "Name: " + (.name // "Unknown"),
-                "Type: " + (.kind // "Unknown"), 
-                "Status: " + (.status // "Unknown"),
-                "Record Count: " + ((.recordCount // 0) | tostring),
-                "Size: " + ((.sizeBytes // 0) | tostring) + " bytes"
-            '
-            echo ""
-            
-            # Analyze field structure with sample query
-            echo "🔍 Analyzing field structure..."
+            # Analyze field structure with sample query across all datasets
+            echo "🔍 Analyzing combined field structure..."
             SAMPLE_QUERY='pick_col * | limit 5'
+            
+            # Convert comma-separated dataset IDs to JSON array for multi-dataset query
+            DATASET_INPUTS=$(echo "$DATASET_IDS" | tr ',' '\n' | jq -R 'select(length > 0)' | jq -s 'map({"datasetId": .})')
+            
             SAMPLE_PAYLOAD=$(jq -n \
-                --arg dataset_id "$dataset_id" \
+                --argjson dataset_inputs "$DATASET_INPUTS" \
                 --arg pipeline "$SAMPLE_QUERY" \
                 '{
                     "query": {
                         "stages": [{
-                            "input": [{"datasetId": $dataset_id}],
+                            "input": $dataset_inputs,
                             "stageID": "main", 
                             "pipeline": $pipeline
                         }]
@@ -592,9 +635,13 @@ class CLITools:
             echo ""
             echo "# Aggregated view:"
             echo "pick_col TIMESTAMP, level | stats count by level | sort count desc"
+            echo ""
+            echo "# Multi-dataset query example:"
+            echo "# Datasets: $(echo \"$DATASET_IDS\" | tr ',' ' ')"
+            echo "# Query will automatically combine data from all specified datasets"
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID to analyze (e.g., 41000001)", required=True)
+                Arg(name="dataset_id", description="Dataset ID to analyze (e.g., 41000001). If not provided, uses OBSERVE_DATASET_IDS environment variable", required=False)
             ],
             image="alpine:latest"
         )
@@ -651,11 +698,17 @@ class CLITools:
                 for LIMIT in 10 100 1000; do
                     echo "Testing query with limit $LIMIT..."
                     
-                    if [ -n "$dataset_id" ]; then
+                    # Use dataset_id if provided, otherwise use first dataset from OBSERVE_DATASET_IDS
+                    BENCH_DATASET="$dataset_id"
+                    if [ -z "$BENCH_DATASET" ] && [ -n "$OBSERVE_DATASET_IDS" ]; then
+                        BENCH_DATASET=$(echo "$OBSERVE_DATASET_IDS" | cut -d',' -f1 | xargs)
+                    fi
+                    
+                    if [ -n "$BENCH_DATASET" ]; then
                         START_TIME=$(date +%s%3N)
                         
                         BENCHMARK_PAYLOAD=$(jq -n \
-                            --arg dataset_id "$dataset_id" \
+                            --arg dataset_id "$BENCH_DATASET" \
                             --arg limit "$LIMIT" \
                             '{
                                 "query": {
@@ -684,7 +737,8 @@ class CLITools:
                             echo "  ❌ Limit $LIMIT: Failed"
                         fi
                     else
-                        echo "  ⚠️ Skipping query benchmark - no dataset_id provided"
+                        echo "  ⚠️ Skipping query benchmark - no dataset ID available"
+                        echo "    Use dataset_id parameter or set OBSERVE_DATASET_IDS environment variable"
                         break
                     fi
                 done
@@ -736,7 +790,7 @@ class CLITools:
             fi
             """,
             args=[
-                Arg(name="dataset_id", description="Dataset ID for query benchmarking (optional)", required=False),
+                Arg(name="dataset_id", description="Dataset ID for query benchmarking. If not provided, uses first dataset from OBSERVE_DATASET_IDS environment variable", required=False),
                 Arg(name="run_benchmark", description="Run performance benchmark tests (true/false)", required=False),
                 Arg(name="save_metrics", description="Save performance metrics to file (true/false)", required=False)
             ],
