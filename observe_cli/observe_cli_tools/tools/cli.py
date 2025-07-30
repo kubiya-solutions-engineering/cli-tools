@@ -32,8 +32,9 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute optimized OPAL queries on Observe datasets. Returns a limited number of recent records from the specified time interval, "
-                "optionally filtered by content in any field. Supports field selection for performance optimization with large records. "
+                "Execute optimized OPAL queries on Observe datasets with flexible filtering options. Returns a limited number of recent records from the specified time interval. "
+                "Supports both simple single-field filtering and advanced multi-filter OPAL pipeline segments (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"'). "
+                "Also supports field selection for performance optimization with large records. "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable and tries both US and EU regional endpoints."
             ),
             content="""
@@ -95,69 +96,62 @@ class CLITools:
                 sleep 1
             fi
             
+            # Enhanced filter handling - support both simple and complex OPAL pipeline segments
+            filter_pipeline=""
+            if [ -n "$filter_term" ]; then
+                # Check if the filter contains pipe characters or looks like a complex OPAL pipeline
+                if echo "$filter_term" | grep -q '|' || echo "$filter_term" | grep -qE 'filter\s+\w+\s*~' || echo "$filter_term" | grep -qE '\b(stats|sort|top|bottom|pick_col)\b'; then
+                    # Advanced/complex filter - use as-is
+                    echo "🔧 Using advanced filter pipeline: $filter_term"
+                    filter_pipeline="$filter_term"
+                    # Add limit if not already present in the pipeline
+                    if ! echo "$filter_pipeline" | grep -q 'limit'; then
+                        filter_pipeline="$filter_pipeline | limit $limit_count"
+                    fi
+                else
+                    # Simple filter - build traditional single filter
+                    echo "🔧 Using simple filter: $filter_type ~ \"$filter_term\""
+                    filter_pipeline="filter $filter_type ~ \"$filter_term\" | limit $limit_count"
+                fi
+            else
+                # No filter, just limit
+                filter_pipeline="limit $limit_count"
+            fi
+            
+            # Combine field selection with filter pipeline
+            pipeline_str="${field_selection}${filter_pipeline}"
+            
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            if [ -n "$filter_term" ]; then
-                pipeline_str=$(printf '%sfilter %s ~ "%s" | limit %s' "$field_selection" "$filter_type" "$filter_term" "$limit_count")
-                echo "📝 OPAL pipeline: $pipeline_str"
-                echo ""
-                sleep 1
-                QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
-                    --arg filter_pipeline "$pipeline_str" \
-                    --arg customer_id "$OBSERVE_CUSTOMER_ID" \
-                    'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
-                    . as $dataset_ids | 
-                    if length == 1 then
-                        [{
-                            inputName: "main",
-                            datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
+            echo "📝 Final OPAL pipeline: $pipeline_str"
+            echo ""
+            sleep 1
+            
+            QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
+                --arg pipeline "$pipeline_str" \
+                --arg customer_id "$OBSERVE_CUSTOMER_ID" \
+                'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
+                . as $dataset_ids | 
+                if length == 1 then
+                    [{
+                        inputName: "main",
+                        datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
+                    }]
+                else
+                    map({
+                        inputName: ("dataset_" + .),
+                        datasetId: ("o::" + $customer_id + ":dataset:" + .)
+                    })
+                end as $inputs |
+                {
+                    "query": {
+                        "stages": [{
+                            "input": $inputs,
+                            "stageID": "main", 
+                            "pipeline": $pipeline
                         }]
-                    else
-                        map({
-                            inputName: ("dataset_" + .),
-                            datasetId: ("o::" + $customer_id + ":dataset:" + .)
-                        })
-                    end as $inputs |
-                    {
-                        "query": {
-                            "stages": [{
-                                "input": $inputs,
-                                "stageID": "main", 
-                                "pipeline": $filter_pipeline
-                            }]
-                        }
-                    }')
-            else
-                pipeline_str=$(printf '%slimit %s' "$field_selection" "$limit_count")
-                echo "📝 OPAL pipeline: $pipeline_str"
-                echo ""
-                sleep 1
-                QUERY_JSON=$(echo "$DATASET_IDS" | jq -R -s \
-                    --arg customer_id "$OBSERVE_CUSTOMER_ID" \
-                    --arg pipeline "$pipeline_str" \
-                    'split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0)) | 
-                    . as $dataset_ids | 
-                    if length == 1 then
-                        [{
-                            inputName: "main",
-                            datasetId: ("o::" + $customer_id + ":dataset:" + $dataset_ids[0])
-                        }]
-                    else
-                        map({
-                            inputName: ("dataset_" + .),
-                            datasetId: ("o::" + $customer_id + ":dataset:" + .)
-                        })
-                    end as $inputs |
-                    {
-                        "query": {
-                            "stages": [{
-                                "input": $inputs,
-                                "stageID": "main", 
-                                "pipeline": $pipeline
-                            }]
-                        }
-                    }')
-            fi
+                    }
+                }')
             
             # Echo the full OPAL query JSON for debugging and transparency
             echo "📋 Full OPAL Query JSON:"
@@ -386,10 +380,10 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now (e.g., '5m', '15m', '30m', '1h')", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Optional filter term to search for (case-insensitive). Searches in the field specified by filter_type (defaults to 'message'). Examples: 'error', 'freighthub', 'exception'", required=False),
-                Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, message, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'message' (log content).", required=False),
+                Arg(name="filter", description="Filter specification - supports both simple and advanced formats:\n• Simple: Single term to search for (e.g., 'error', 'freighthub') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment with multiple filters (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n• Complex: Any OPAL operations like 'filter status >= 400 | stats count by endpoint | sort count desc'\nThe tool automatically detects format based on content (pipes, OPAL keywords, etc.)", required=False),
+                Arg(name="filter_type", description="Field to search in for simple filters. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, message, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'message' (log content). Ignored when using advanced filter format.", required=False),
                 Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,user,statusCode,message'). Use for targeted analysis or performance optimization.", required=False),
-                Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume)", required=False)
+                Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
             image="alpine:latest"
         )
