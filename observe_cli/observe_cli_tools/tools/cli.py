@@ -79,7 +79,7 @@ class CLITools:
             fi
             
             if [ -z "$limit_count" ]; then
-                limit_count="25"  # Reduced from 250 for performance with large records
+                limit_count="500"  # Default limit for balanced performance and data volume
             fi
             
             # Build field selection part of pipeline
@@ -158,10 +158,14 @@ class CLITools:
                         }
                     }')
             fi
+            
+            # Echo the full OPAL query JSON for debugging and transparency
+            echo "📋 Full OPAL Query JSON:"
+            echo "$QUERY_JSON" | jq .
             echo ""
             
             # Performance guidance
-            if [ "$limit_count" -gt 50 ]; then
+            if [ "$limit_count" -gt 1000 ]; then
                 echo "⚠️  High limit ($limit_count) may cause slow responses with large log records"
                 echo "💡 Consider starting with a smaller limit and increasing if needed"
             fi
@@ -385,7 +389,7 @@ class CLITools:
                 Arg(name="filter", description="Optional filter term to search for (case-insensitive). Searches in the field specified by filter_type (defaults to 'message'). Examples: 'error', 'freighthub', 'exception'", required=False),
                 Arg(name="filter_type", description="Field to search in. Available fields: timestamp, applicationName, type, httpMethod, requestURI, statusCode, message, sleuthTraceId, sleuthSpanId, node, vendorCode, user, company, endpoint, eventId, headers, tenantId, transportationMode, userId. Defaults to 'message' (log content).", required=False),
                 Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,user,statusCode,message'). Use for targeted analysis or performance optimization.", required=False),
-                Arg(name="limit", description="Maximum number of records to return (default: 25, reduced for performance with large records)", required=False)
+                Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume)", required=False)
             ],
             image="alpine:latest"
         )
