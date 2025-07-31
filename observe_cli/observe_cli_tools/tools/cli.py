@@ -43,7 +43,7 @@ class CLITools:
             # Validate environment
             if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$DATASET_IDS" ]; then
                 echo "❌ OBSERVE_API_KEYS, OBSERVE_CUSTOMER_ID, and DATASET_IDS are required"
-                exit 1
+                exit 0
             fi
             
             echo "🔧 Using dataset IDs: $DATASET_IDS"
@@ -52,7 +52,7 @@ class CLITools:
             # Install required tools
             apk add --no-cache jq curl bc >/dev/null 2>&1 || {
                 echo "❌ Failed to install jq, curl, and bc"
-                exit 1
+                exit 0
             }
             
             # Parse API keys from JSON
@@ -62,7 +62,7 @@ class CLITools:
             if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
                 echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
                 echo "Expected format: {\"NA\": \"key1\", \"EU\": \"key2\"}"
-                exit 1
+                exit 0
             fi
             
             # Parse arguments
@@ -167,14 +167,14 @@ class CLITools:
             # Validate that the query was constructed successfully
             if [ -z "$QUERY_JSON" ] || ! echo "$QUERY_JSON" | jq empty 2>/dev/null; then
                 echo "❌ Failed to construct query JSON from dataset IDs: $DATASET_IDS"
-                exit 1
+                exit 0
             fi
             
             # Validate that we have at least one dataset input
             INPUT_COUNT=$(echo "$QUERY_JSON" | jq -r '.query.stages[0].input | length')
             if [ "$INPUT_COUNT" -eq 0 ]; then
                 echo "❌ No valid dataset IDs found in dataset IDs: $DATASET_IDS"
-                exit 1
+                exit 0
             fi
             
             # Build API URL with time parameters
@@ -335,7 +335,7 @@ class CLITools:
                 echo "❌ Failed to execute query in both US and EU regions"
                 echo "💡 Verify your dataset IDs are correct and you have access to them"
                 sleep 1
-                exit 1
+                exit 0
             fi
             
             echo "🌍 Using region: $REGION_USED"
@@ -430,7 +430,7 @@ class CLITools:
                         echo "✏️  Custom Query:"
                     else
                         echo "❌ No query specified. Use query_type parameter or provide custom_query."
-                        exit 1
+                        exit 0
                     fi
                     ;;
             esac
@@ -526,7 +526,7 @@ class CLITools:
             # Validate inputs
             if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$dataset_id" ]; then
                 echo "❌ Missing required parameters: OBSERVE_API_KEYS, OBSERVE_CUSTOMER_ID, dataset_id"
-                exit 1
+                exit 0
             fi
             
             # Parse API keys from JSON
@@ -536,7 +536,7 @@ class CLITools:
             if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
                 echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
                 echo "Expected format: {\"NA\": \"key1\", \"EU\": \"key2\"}"
-                exit 1
+                exit 0
             fi
             
             echo "🔬 Dataset Analysis Report"
@@ -633,7 +633,7 @@ class CLITools:
                 echo "❌ Failed to fetch dataset metadata from both US and EU regions"
                 echo "💡 Verify dataset ID exists and you have access to it"
                 sleep 1
-                exit 1
+                exit 0
             fi
             
             echo "🌍 Using region: $REGION_USED"
@@ -777,7 +777,7 @@ class CLITools:
             # Validate connection
             if [ -z "$OBSERVE_API_KEYS" ] || [ -z "$OBSERVE_CUSTOMER_ID" ]; then
                 echo "❌ Missing credentials"
-                exit 1
+                exit 0
             fi
             
             # Parse API keys from JSON
@@ -787,7 +787,7 @@ class CLITools:
             if [ -z "$NA_API_KEY" ] || [ -z "$EU_API_KEY" ]; then
                 echo "❌ OBSERVE_API_KEYS must contain both 'NA' and 'EU' keys"
                 echo "Expected format: {\"NA\": \"key1\", \"EU\": \"key2\"}"
-                exit 1
+                exit 0
             fi
             
             # Try both regions for API health check
@@ -884,7 +884,7 @@ class CLITools:
                 echo "❌ Failed to check API health in both US and EU regions"
                 echo "💡 Verify your credentials and network connectivity"
                 sleep 1
-                exit 1
+                exit 0
             fi
             
             echo "🌍 Using region: $REGION_USED"
