@@ -86,9 +86,9 @@ class CLITools:
             # Build field selection part of pipeline
             field_selection=""
             if [ -n "$fields" ]; then
-                # User specified specific fields
-                field_selection="pick_col $fields | "
-                echo "📝 Field selection: $fields"
+                # User specified specific fields - will be added AFTER filtering
+                field_selection="pick_col $fields"
+                echo "📝 Field selection: $fields (applied after filtering)"
             else
                 # Default behavior - include all fields but warn about potential size
                 echo "💡 Including all fields (including message with log content)"
@@ -118,8 +118,24 @@ class CLITools:
                 filter_pipeline="limit $limit_count"
             fi
             
-            # Combine field selection with filter pipeline
-            pipeline_str="${field_selection}${filter_pipeline}"
+            # Combine filter pipeline with field selection in correct order
+            # Order: filter operations first, then field selection, then limit
+            if [ -n "$filter_term" ] && [ -n "$field_selection" ]; then
+                # Both filter and field selection - need to insert field selection before final limit
+                if echo "$filter_pipeline" | grep -q "| limit"; then
+                    # Replace "| limit X" with "| pick_col fields | limit X"
+                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit \([0-9]*\)$/| $field_selection | limit \1/")
+                else
+                    # No limit in filter pipeline, just append field selection
+                    pipeline_str="$filter_pipeline | $field_selection"
+                fi
+            elif [ -n "$field_selection" ]; then
+                # Only field selection, no filter
+                pipeline_str="$field_selection | limit $limit_count"
+            else
+                # Only filter or just limit
+                pipeline_str="$filter_pipeline"
+            fi
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
@@ -380,9 +396,9 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now (e.g., '5m', '15m', '30m', '1h')", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Filter specification - supports both simple and advanced formats:\n• Simple: Single term to search for (e.g., 'error', 'freighthub') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment with multiple filters (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n• Complex: Any OPAL operations like 'filter status >= 400 | stats count by endpoint | sort count desc'\nThe tool automatically detects format based on content (pipes, OPAL keywords, etc.)", required=False),
-                Arg(name="filter_type", description="Field to search in for simple filters. Common fields include: timestamp, applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId. Note: Field availability varies by dataset - use observe_dataset_analyzer to see exact fields. Defaults to 'message' (log content). Ignored when using advanced filter format.", required=False),
-                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Use for targeted analysis or performance optimization. WARNING: Field names must exist in the dataset or the query will fail. Common fields include: timestamp, applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId. To discover available fields, either: 1) Leave this parameter empty to get all fields (safer but slower), or 2) Use observe_dataset_analyzer first to see exact field names for the dataset.", required=False),
+                Arg(name="filter", description="Filter specification - supports both simple and advanced formats:\n• Simple: Single term to search for (e.g., 'error', 'push-api-configuration-service') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment with multiple filters (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n• Complex: Any OPAL operations like 'filter status >= 400 | stats count by endpoint | sort count desc'\nThe tool automatically detects format based on content (pipes, OPAL keywords, etc.). IMPORTANT: Filtering happens BEFORE field selection, so you can filter on any field in the original dataset even if it's not included in the 'fields' parameter.", required=False),
+                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Common fields include: applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId, timestamp. Field availability varies by dataset - use observe_dataset_analyzer to discover exact field names. Defaults to 'message' (log content). This parameter is only used when 'filter' is a simple search term, not when it contains OPAL pipeline syntax.", required=False),
+                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Common fields: timestamp, applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId. To discover available fields: 1) Leave empty to get all fields (safer but slower), or 2) Use observe_dataset_analyzer first to see exact field names.", required=False),
                 Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
             image="alpine:latest"
