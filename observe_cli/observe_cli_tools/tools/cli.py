@@ -257,6 +257,7 @@ class CLITools:
                 CURL_START=$(date +%s)
                 
                 # Simple curl command - no timeouts since legitimate queries can take time
+                # Note: Not using --fail so we can capture error response bodies
                 RESPONSE=$(curl -s \
                     --insecure \
                     "$API_URL" \
@@ -265,7 +266,7 @@ class CLITools:
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
-                    --fail)
+                    --write-out "HTTPSTATUS:%{http_code}")
                     
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
@@ -274,41 +275,66 @@ class CLITools:
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
                 sleep 1
                 
+                # Extract HTTP status code and response body
+                HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTPSTATUS:" | cut -d: -f2)
+                RESPONSE_BODY=$(echo "$RESPONSE" | sed 's/HTTPSTATUS:[0-9]*$//')
+                
                 if [ $CURL_EXIT_CODE -ne 0 ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
                     case $CURL_EXIT_CODE in
                         28) echo "   💡 Timeout occurred (${CURL_DURATION}s)" ;;
                         6)  echo "   💡 Couldn't resolve host: $API_BASE_URL" ;;
                         7)  echo "   💡 Failed to connect to host: $API_BASE_URL" ;;
-                        22) echo "   💡 HTTP error response (404 - wrong region)" ;;
                         52) echo "   💡 Empty reply from server" ;;
                         60) echo "   💡 SSL certificate verification failed" ;;
                         *) echo "   💡 Curl error $CURL_EXIT_CODE" ;;
                     esac
-                    echo "   📝 Curl output: $(echo "$RESPONSE" | tail -5)"
+                    if [ -n "$RESPONSE_BODY" ]; then
+                        echo "   📝 Response body: $(echo "$RESPONSE_BODY" | head -5)"
+                    fi
                     echo ""
                     sleep 1
                     continue
                 fi
                 
-                if [ -z "$RESPONSE" ]; then
+                # Check HTTP status code for API errors
+                if [ "$HTTP_STATUS" -ge 400 ] 2>/dev/null; then
+                    echo "   ❌ HTTP $HTTP_STATUS error from API"
+                    if [ -n "$RESPONSE_BODY" ]; then
+                        echo "   📝 API Error Response:"
+                        # Try to format JSON if possible, otherwise show raw
+                        if echo "$RESPONSE_BODY" | jq empty >/dev/null 2>&1; then
+                            echo "$RESPONSE_BODY" | jq -r '.message // .error // .' 2>/dev/null || echo "$RESPONSE_BODY"
+                        else
+                            echo "$RESPONSE_BODY"
+                        fi
+                    fi
+                    if [ "$HTTP_STATUS" = "404" ]; then
+                        echo "   💡 404 likely means wrong region - trying next region"
+                    fi
+                    echo ""
+                    sleep 1
+                    continue
+                fi
+                
+                if [ -z "$RESPONSE_BODY" ]; then
                     echo "   ✅ Empty response - query executed successfully but found no matching data"
                     echo "   💡 This usually means your filter didn't match any records"
                     REGION_USED="$REGION"
-                    RESPONSE='{"data":[],"message":"No data found matching your query criteria"}'
+                    RESPONSE_BODY='{"data":[],"message":"No data found matching your query criteria"}'
                     echo ""
                     sleep 1
                     break
                 fi
                 
-                echo "   📏 Response length: $(echo "$RESPONSE" | wc -c) characters"
+                echo "   📏 Response length: $(echo "$RESPONSE_BODY" | wc -c) characters"
                 
-                # Extract just the JSON part (curl -v adds debug info)
-                JSON_RESPONSE=$(echo "$RESPONSE" | sed -n '/^{/,$p' | tail -n +1)
+                # Use response body directly as JSON (no need to extract since we're not using -v)
+                JSON_RESPONSE="$RESPONSE_BODY"
                 
                 if [ -z "$JSON_RESPONSE" ]; then
                     echo "   ❌ No JSON found in response"
-                    echo "   📄 Raw response: $(echo "$RESPONSE" | head -5)"
+                    echo "   📄 Raw response: $(echo "$RESPONSE_BODY" | head -5)"
                     echo ""
                     sleep 1
                     continue
