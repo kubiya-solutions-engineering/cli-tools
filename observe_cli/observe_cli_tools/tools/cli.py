@@ -221,6 +221,12 @@ class CLITools:
             echo ""
             sleep 1
             
+            echo "=================================="
+            echo "🔥🔥🔥 DEBUG: NEW CODE IS RUNNING! 🔥🔥🔥"
+            echo "🔥🔥🔥 TIMESTAMP: $(date) 🔥🔥🔥"
+            echo "🔥🔥🔥 LIMIT COUNT: '$limit_count' 🔥🔥🔥"
+            echo "=================================="
+            
             # Track query start time for performance monitoring
             START_TIME=$(date +%s)
             
