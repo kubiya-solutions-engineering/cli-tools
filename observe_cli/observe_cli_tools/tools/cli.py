@@ -256,9 +256,12 @@ class CLITools:
                 
                 CURL_START=$(date +%s)
                 
-                # Simple curl command - no timeouts since legitimate queries can take time
-                # Note: Not using --fail so we can capture error response bodies
-                RESPONSE=$(curl -s \
+                # Create temporary files for capturing response and headers
+                TEMP_RESPONSE="/tmp/observe_response_$$"
+                TEMP_HEADERS="/tmp/observe_headers_$$"
+                
+                # Curl command that captures both response body and headers
+                curl -s \
                     --insecure \
                     "$API_URL" \
                     --request POST \
@@ -266,7 +269,8 @@ class CLITools:
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
-                    --write-out "HTTPSTATUS:%{http_code}")
+                    --output "$TEMP_RESPONSE" \
+                    --dump-header "$TEMP_HEADERS"
                     
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
@@ -275,11 +279,23 @@ class CLITools:
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
                 sleep 1
                 
-                # Extract HTTP status code and response body
-                HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTPSTATUS:" | cut -d: -f2)
-                RESPONSE_BODY=$(echo "$RESPONSE" | sed 's/HTTPSTATUS:[0-9]*$//')
+                # Extract HTTP status code from headers
+                HTTP_STATUS=""
+                if [ -f "$TEMP_HEADERS" ]; then
+                    HTTP_STATUS=$(head -1 "$TEMP_HEADERS" | cut -d' ' -f2)
+                fi
                 
-                if [ $CURL_EXIT_CODE -ne 0 ]; then
+                # Read response body
+                RESPONSE_BODY=""
+                if [ -f "$TEMP_RESPONSE" ]; then
+                    RESPONSE_BODY=$(cat "$TEMP_RESPONSE")
+                fi
+                
+                # Clean up temp files
+                rm -f "$TEMP_RESPONSE" "$TEMP_HEADERS" 2>/dev/null
+                
+                # Handle curl failures (network issues, etc.)
+                if [ $CURL_EXIT_CODE -ne 0 ] && [ -z "$HTTP_STATUS" ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
                     case $CURL_EXIT_CODE in
                         28) echo "   💡 Timeout occurred (${CURL_DURATION}s)" ;;
@@ -289,16 +305,13 @@ class CLITools:
                         60) echo "   💡 SSL certificate verification failed" ;;
                         *) echo "   💡 Curl error $CURL_EXIT_CODE" ;;
                     esac
-                    if [ -n "$RESPONSE_BODY" ]; then
-                        echo "   📝 Response body: $(echo "$RESPONSE_BODY" | head -5)"
-                    fi
                     echo ""
                     sleep 1
                     continue
                 fi
                 
                 # Check HTTP status code for API errors
-                if [ "$HTTP_STATUS" -ge 400 ] 2>/dev/null; then
+                if [ -n "$HTTP_STATUS" ] && [ "$HTTP_STATUS" -ge 400 ] 2>/dev/null; then
                     echo "   ❌ HTTP $HTTP_STATUS error from API"
                     if [ -n "$RESPONSE_BODY" ]; then
                         echo "   📝 API Error Response:"
@@ -308,6 +321,8 @@ class CLITools:
                         else
                             echo "$RESPONSE_BODY"
                         fi
+                    else
+                        echo "   📝 No response body received"
                     fi
                     if [ "$HTTP_STATUS" = "404" ]; then
                         echo "   💡 404 likely means wrong region - trying next region"
@@ -329,7 +344,7 @@ class CLITools:
                 
                 echo "   📏 Response length: $(echo "$RESPONSE_BODY" | wc -c) characters"
                 
-                # Use response body directly as JSON (no need to extract since we're not using -v)
+                # Use response body directly as JSON
                 JSON_RESPONSE="$RESPONSE_BODY"
                 
                 if [ -z "$JSON_RESPONSE" ]; then
