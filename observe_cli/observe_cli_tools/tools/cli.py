@@ -141,12 +141,6 @@ class CLITools:
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
-            
-            echo "🔥🔥🔥 DEBUG PIPELINE CONSTRUCTION 🔥🔥🔥"
-            echo "🔥 limit_count: '$limit_count'"
-            echo "🔥 pipeline_str: '$pipeline_str'"
-            echo "🔥🔥🔥 END DEBUG 🔥🔥🔥"
-            
             echo "📝 Final OPAL pipeline: $pipeline_str"
             echo ""
             sleep 1
@@ -227,12 +221,6 @@ class CLITools:
             echo ""
             sleep 1
             
-            echo "=================================="
-            echo "🔥🔥🔥 DEBUG: NEW CODE IS RUNNING! 🔥🔥🔥"
-            echo "🔥🔥🔥 TIMESTAMP: $(date) 🔥🔥🔥"
-            echo "🔥🔥🔥 LIMIT COUNT: '$limit_count' 🔥🔥🔥"
-            echo "=================================="
-            
             # Track query start time for performance monitoring
             START_TIME=$(date +%s)
             
@@ -293,9 +281,7 @@ class CLITools:
                 HTTP_STATUS=$(echo "$RESPONSE_WITH_STATUS" | grep "HTTPSTATUS:" | cut -d: -f2)
                 RESPONSE_BODY=$(echo "$RESPONSE_WITH_STATUS" | sed '/HTTPSTATUS:/d')
                 
-                # Debug output (remove in production)
-                echo "   🔍 Debug - HTTP Status: '$HTTP_STATUS'"
-                echo "   🔍 Debug - Response Body Length: $(echo "$RESPONSE_BODY" | wc -c)"
+
                 
                 # Handle curl failures (network issues, etc.)
                 if [ $CURL_EXIT_CODE -ne 0 ] && [ -z "$HTTP_STATUS" ]; then
@@ -441,8 +427,8 @@ class CLITools:
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
                 Arg(name="filter", description="Filter specification - supports both simple and advanced formats:\n• Simple: Single term to search for (e.g., 'error', 'push-api-configuration-service') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment with multiple filters (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n• Complex: Any OPAL operations like 'filter status >= 400 | stats count by endpoint | sort count desc'\nThe tool automatically detects format based on content (pipes, OPAL keywords, etc.). IMPORTANT: Filtering happens BEFORE field selection, so you can filter on any field in the original dataset even if it's not included in the 'fields' parameter.", required=False),
-                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Common fields include: applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId, timestamp. Field availability varies by dataset - use observe_dataset_analyzer to discover exact field names. Defaults to 'message' (log content). This parameter is only used when 'filter' is a simple search term, not when it contains OPAL pipeline syntax.", required=False),
-                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Common fields: timestamp, applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId. To discover available fields: 1) Leave empty to get all fields (safer but slower), or 2) Use observe_dataset_analyzer first to see exact field names.", required=False),
+                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Defaults to 'message' (log content). This parameter is only used when 'filter' is a simple search term, not when it contains OPAL pipeline syntax.", required=False),
+                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Leave empty to get all fields (safer but slower).", required=False),
                 Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
             image="alpine:latest"
