@@ -141,6 +141,12 @@ class CLITools:
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
+            
+            echo "🔥🔥🔥 DEBUG PIPELINE CONSTRUCTION 🔥🔥🔥"
+            echo "🔥 limit_count: '$limit_count'"
+            echo "🔥 pipeline_str: '$pipeline_str'"
+            echo "🔥🔥🔥 END DEBUG 🔥🔥🔥"
+            
             echo "📝 Final OPAL pipeline: $pipeline_str"
             echo ""
             sleep 1
