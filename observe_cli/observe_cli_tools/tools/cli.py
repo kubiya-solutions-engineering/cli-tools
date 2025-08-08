@@ -72,14 +72,15 @@ class CLITools:
             filter_term="$filter"
             filter_type="$filter_type"
             fields="$fields"
-            limit_count="$limit"
+            # Clean up limit parameter by removing any control characters and whitespace
+            limit_count=$(echo "$limit" | tr -d '[:cntrl:]' | tr -d '[:space:]')
             
             # Default values for performance optimization
             if [ -z "$filter_type" ]; then
                 filter_type="message"
             fi
             
-            if [ -z "$limit_count" ]; then
+            if [ -z "$limit_count" ] || ! echo "$limit_count" | grep -qE '^[0-9]+$'; then
                 limit_count="500"  # Default limit for balanced performance and data volume
             fi
             
@@ -124,12 +125,8 @@ class CLITools:
                 # Both filter and field selection - need to insert field selection before final limit
                 if echo "$filter_pipeline" | grep -q "| limit"; then
                     # Replace "| limit X" with "| pick_col fields | limit X"
-                    # First, extract the limit number properly
-                    limit_num=$(echo "$filter_pipeline" | sed -n 's/.*| limit \([0-9]*\)$/\1/p')
-                    if [ -z "$limit_num" ]; then
-                        limit_num="$limit_count"
-                    fi
-                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit [0-9]*$/| $field_selection | limit $limit_num/")
+                    # Extract the existing limit number, but always use our clean limit_count
+                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit [0-9]*$/| $field_selection | limit $limit_count/")
                 else
                     # No limit in filter pipeline, just append field selection
                     pipeline_str="$filter_pipeline | $field_selection"
@@ -283,6 +280,10 @@ class CLITools:
                 # Extract HTTP status code and response body
                 HTTP_STATUS=$(echo "$RESPONSE_WITH_STATUS" | grep "HTTPSTATUS:" | cut -d: -f2)
                 RESPONSE_BODY=$(echo "$RESPONSE_WITH_STATUS" | sed '/HTTPSTATUS:/d')
+                
+                # Debug output (remove in production)
+                echo "   🔍 Debug - HTTP Status: '$HTTP_STATUS'"
+                echo "   🔍 Debug - Response Body Length: $(echo "$RESPONSE_BODY" | wc -c)"
                 
                 # Handle curl failures (network issues, etc.)
                 if [ $CURL_EXIT_CODE -ne 0 ] && [ -z "$HTTP_STATUS" ]; then
