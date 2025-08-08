@@ -72,14 +72,15 @@ class CLITools:
             filter_term="$filter"
             filter_type="$filter_type"
             fields="$fields"
-            limit_count="$limit"
+            # Clean up limit parameter by removing any control characters and whitespace
+            limit_count=$(echo "$limit" | tr -d '[:cntrl:]' | tr -d '[:space:]')
             
             # Default values for performance optimization
             if [ -z "$filter_type" ]; then
                 filter_type="message"
             fi
             
-            if [ -z "$limit_count" ]; then
+            if [ -z "$limit_count" ] || ! echo "$limit_count" | grep -qE '^[0-9]+$'; then
                 limit_count="500"  # Default limit for balanced performance and data volume
             fi
             
@@ -124,7 +125,8 @@ class CLITools:
                 # Both filter and field selection - need to insert field selection before final limit
                 if echo "$filter_pipeline" | grep -q "| limit"; then
                     # Replace "| limit X" with "| pick_col fields | limit X"
-                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit \([0-9]*\)$/| $field_selection | limit \1/")
+                    # Extract the existing limit number, but always use our clean limit_count
+                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit [0-9]*$/| $field_selection | limit $limit_count/")
                 else
                     # No limit in filter pipeline, just append field selection
                     pipeline_str="$filter_pipeline | $field_selection"
@@ -256,8 +258,9 @@ class CLITools:
                 
                 CURL_START=$(date +%s)
                 
-                # Simple curl command - no timeouts since legitimate queries can take time
-                RESPONSE=$(curl -s \
+                # Use a more robust approach with curl's --write-out for HTTP status
+                # and capture both stdout and stderr
+                RESPONSE_WITH_STATUS=$(curl -s \
                     --insecure \
                     "$API_URL" \
                     --request POST \
@@ -265,7 +268,7 @@ class CLITools:
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
-                    --fail)
+                    --write-out "\nHTTPSTATUS:%{http_code}" 2>&1)
                     
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
@@ -274,41 +277,68 @@ class CLITools:
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
                 sleep 1
                 
-                if [ $CURL_EXIT_CODE -ne 0 ]; then
+                # Extract HTTP status code and response body
+                HTTP_STATUS=$(echo "$RESPONSE_WITH_STATUS" | grep "HTTPSTATUS:" | cut -d: -f2)
+                RESPONSE_BODY=$(echo "$RESPONSE_WITH_STATUS" | sed '/HTTPSTATUS:/d')
+                
+
+                
+                # Handle curl failures (network issues, etc.)
+                if [ $CURL_EXIT_CODE -ne 0 ] && [ -z "$HTTP_STATUS" ]; then
                     echo "   ❌ Curl failed with exit code $CURL_EXIT_CODE"
                     case $CURL_EXIT_CODE in
                         28) echo "   💡 Timeout occurred (${CURL_DURATION}s)" ;;
                         6)  echo "   💡 Couldn't resolve host: $API_BASE_URL" ;;
                         7)  echo "   💡 Failed to connect to host: $API_BASE_URL" ;;
-                        22) echo "   💡 HTTP error response (404 - wrong region)" ;;
                         52) echo "   💡 Empty reply from server" ;;
                         60) echo "   💡 SSL certificate verification failed" ;;
                         *) echo "   💡 Curl error $CURL_EXIT_CODE" ;;
                     esac
-                    echo "   📝 Curl output: $(echo "$RESPONSE" | tail -5)"
                     echo ""
                     sleep 1
                     continue
                 fi
                 
-                if [ -z "$RESPONSE" ]; then
+                # Check HTTP status code for API errors
+                if [ -n "$HTTP_STATUS" ] && [ "$HTTP_STATUS" -ge 400 ] 2>/dev/null; then
+                    echo "   ❌ HTTP $HTTP_STATUS error from API"
+                    if [ -n "$RESPONSE_BODY" ]; then
+                        echo "   📝 API Error Response:"
+                        # Try to format JSON if possible, otherwise show raw
+                        if echo "$RESPONSE_BODY" | jq empty >/dev/null 2>&1; then
+                            echo "$RESPONSE_BODY" | jq -r '.message // .error // .' 2>/dev/null || echo "$RESPONSE_BODY"
+                        else
+                            echo "$RESPONSE_BODY"
+                        fi
+                    else
+                        echo "   📝 No response body received"
+                    fi
+                    if [ "$HTTP_STATUS" = "404" ]; then
+                        echo "   💡 404 likely means wrong region - trying next region"
+                    fi
+                    echo ""
+                    sleep 1
+                    continue
+                fi
+                
+                if [ -z "$RESPONSE_BODY" ]; then
                     echo "   ✅ Empty response - query executed successfully but found no matching data"
                     echo "   💡 This usually means your filter didn't match any records"
                     REGION_USED="$REGION"
-                    RESPONSE='{"data":[],"message":"No data found matching your query criteria"}'
+                    RESPONSE_BODY='{"data":[],"message":"No data found matching your query criteria"}'
                     echo ""
                     sleep 1
                     break
                 fi
                 
-                echo "   📏 Response length: $(echo "$RESPONSE" | wc -c) characters"
+                echo "   📏 Response length: $(echo "$RESPONSE_BODY" | wc -c) characters"
                 
-                # Extract just the JSON part (curl -v adds debug info)
-                JSON_RESPONSE=$(echo "$RESPONSE" | sed -n '/^{/,$p' | tail -n +1)
+                # Use response body directly as JSON
+                JSON_RESPONSE="$RESPONSE_BODY"
                 
                 if [ -z "$JSON_RESPONSE" ]; then
                     echo "   ❌ No JSON found in response"
-                    echo "   📄 Raw response: $(echo "$RESPONSE" | head -5)"
+                    echo "   📄 Raw response: $(echo "$RESPONSE_BODY" | head -5)"
                     echo ""
                     sleep 1
                     continue
@@ -397,8 +427,8 @@ class CLITools:
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
                 Arg(name="filter", description="Filter specification - supports both simple and advanced formats:\n• Simple: Single term to search for (e.g., 'error', 'push-api-configuration-service') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment with multiple filters (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n• Complex: Any OPAL operations like 'filter status >= 400 | stats count by endpoint | sort count desc'\nThe tool automatically detects format based on content (pipes, OPAL keywords, etc.). IMPORTANT: Filtering happens BEFORE field selection, so you can filter on any field in the original dataset even if it's not included in the 'fields' parameter.", required=False),
-                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Common fields include: applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId, timestamp. Field availability varies by dataset - use observe_dataset_analyzer to discover exact field names. Defaults to 'message' (log content). This parameter is only used when 'filter' is a simple search term, not when it contains OPAL pipeline syntax.", required=False),
-                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Common fields: timestamp, applicationName, level, message, host, loggerName, sleuthTraceId, sleuthSpanId. To discover available fields: 1) Leave empty to get all fields (safer but slower), or 2) Use observe_dataset_analyzer first to see exact field names.", required=False),
+                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Defaults to 'message' (log content). This parameter is only used when 'filter' is a simple search term, not when it contains OPAL pipeline syntax.", required=False),
+                Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Leave empty to get all fields (safer but slower).", required=False),
                 Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
             image="alpine:latest"
