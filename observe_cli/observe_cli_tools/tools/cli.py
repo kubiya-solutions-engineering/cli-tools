@@ -124,7 +124,12 @@ class CLITools:
                 # Both filter and field selection - need to insert field selection before final limit
                 if echo "$filter_pipeline" | grep -q "| limit"; then
                     # Replace "| limit X" with "| pick_col fields | limit X"
-                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit \([0-9]*\)$/| $field_selection | limit \1/")
+                    # First, extract the limit number properly
+                    limit_num=$(echo "$filter_pipeline" | sed -n 's/.*| limit \([0-9]*\)$/\1/p')
+                    if [ -z "$limit_num" ]; then
+                        limit_num="$limit_count"
+                    fi
+                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit [0-9]*$/| $field_selection | limit $limit_num/")
                 else
                     # No limit in filter pipeline, just append field selection
                     pipeline_str="$filter_pipeline | $field_selection"
@@ -256,12 +261,9 @@ class CLITools:
                 
                 CURL_START=$(date +%s)
                 
-                # Create temporary files for capturing response and headers
-                TEMP_RESPONSE="/tmp/observe_response_$$"
-                TEMP_HEADERS="/tmp/observe_headers_$$"
-                
-                # Curl command that captures both response body and headers
-                curl -s \
+                # Use a more robust approach with curl's --write-out for HTTP status
+                # and capture both stdout and stderr
+                RESPONSE_WITH_STATUS=$(curl -s \
                     --insecure \
                     "$API_URL" \
                     --request POST \
@@ -269,8 +271,7 @@ class CLITools:
                     --header "Content-Type: application/json" \
                     --header "Accept: application/x-ndjson" \
                     --data-raw "$QUERY_JSON" \
-                    --output "$TEMP_RESPONSE" \
-                    --dump-header "$TEMP_HEADERS"
+                    --write-out "\nHTTPSTATUS:%{http_code}" 2>&1)
                     
                 CURL_EXIT_CODE=$?
                 CURL_END=$(date +%s)
@@ -279,20 +280,9 @@ class CLITools:
                 echo "   ⏱️  Curl completed in ${CURL_DURATION}s (exit code: $CURL_EXIT_CODE)"
                 sleep 1
                 
-                # Extract HTTP status code from headers
-                HTTP_STATUS=""
-                if [ -f "$TEMP_HEADERS" ]; then
-                    HTTP_STATUS=$(head -1 "$TEMP_HEADERS" | cut -d' ' -f2)
-                fi
-                
-                # Read response body
-                RESPONSE_BODY=""
-                if [ -f "$TEMP_RESPONSE" ]; then
-                    RESPONSE_BODY=$(cat "$TEMP_RESPONSE")
-                fi
-                
-                # Clean up temp files
-                rm -f "$TEMP_RESPONSE" "$TEMP_HEADERS" 2>/dev/null
+                # Extract HTTP status code and response body
+                HTTP_STATUS=$(echo "$RESPONSE_WITH_STATUS" | grep "HTTPSTATUS:" | cut -d: -f2)
+                RESPONSE_BODY=$(echo "$RESPONSE_WITH_STATUS" | sed '/HTTPSTATUS:/d')
                 
                 # Handle curl failures (network issues, etc.)
                 if [ $CURL_EXIT_CODE -ne 0 ] && [ -z "$HTTP_STATUS" ]; then
