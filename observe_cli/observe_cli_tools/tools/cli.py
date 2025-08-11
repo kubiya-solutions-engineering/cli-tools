@@ -76,7 +76,7 @@ class CLITools:
             fi
             
             if [ -z "$limit_count" ] || ! echo "$limit_count" | grep -qE '^[0-9]+$'; then
-                limit_count="500"  # Default limit for balanced performance and data volume
+                limit_count="25"
             fi
             
             # Build field selection part of pipeline
@@ -424,7 +424,7 @@ class CLITools:
                 Arg(name="filter", description="Filter term or OPAL pipeline. Simple: '500', 'error', 'timeout'. Advanced: 'filter level ~ \"ERROR\"' or 'filter applicationName ~ \"my-app\"'. Available fields: timestamp, applicationName, level, host, message, tags. No 'status' field - HTTP codes in message field.", required=False),
                 Arg(name="filter_type", description="Field for simple filters. Options: message (default - for HTTP codes, errors), applicationName (service names), level (ERROR, WARN, INFO), host (server names), tags. Ignored for advanced filters.", required=False),
                 Arg(name="fields", description="Comma-separated fields to return (e.g., 'timestamp,message,level'). Available: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Leave empty for all fields. Must match exact names.", required=False),
-                Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
+                Arg(name="limit", description="Maximum number of records to return (default: 25). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
             image="alpine:latest"
         )
