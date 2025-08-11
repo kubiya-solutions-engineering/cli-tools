@@ -29,14 +29,11 @@ class CLITools:
             name="observe_opal_query",
             description=(
                 "Execute OPAL queries on Observe datasets with flexible filtering. Returns newest records first. "
-                "Supports simple and advanced filtering, field selection, log level filtering, and tries both US/EU endpoints.\n\n"
+                "Supports simple and advanced filtering, field selection, and tries both US/EU endpoints.\n\n"
                 "SORTING: Always returns newest records first. When limit=10 and 50 results match, you get the 10 MOST RECENT records.\n\n"
-                "SMART LEVEL FILTERING: Use level parameter for log level filtering (ERROR, WARN, INFO, DEBUG). "
-                "Perfect for 5xx server errors: filter='500' level='ERROR' automatically combines both filters.\n\n"
                 "EXAMPLES:\n"
-                "• Recent 500 errors: filter='500' level='ERROR'\n"
-                "• All ERROR logs: level='ERROR'\n"
-                "• App errors: filter='filter applicationName ~ \"my-service\"' level='ERROR'\n"
+                "• Recent 500 errors: filter='500'\n"
+                "• App errors: filter='filter applicationName ~ \"my-service\" and level ~ \"ERROR\"'\n"
                 "• Latest timeouts: filter='timeout' with interval='1h'\n\n"
                 "FIELDS: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. "
                 "HTTP status codes are in 'message' field content."
@@ -74,7 +71,6 @@ class CLITools:
             start_time="$start_time"
             end_time="$end_time"
             filter_term="$filter"
-            level_filter="$level"
             fields="$fields"
 
             # Clean up limit parameter by removing any control characters and whitespace
@@ -127,25 +123,6 @@ class CLITools:
             else
                 # No filter, start with empty pipeline
                 filter_pipeline=""
-            fi
-            
-            # Add level filter if specified
-            if [ -n "$level_filter" ]; then
-                level_filter_clause="filter level ~ \"$level_filter\""
-                echo "🔧 Adding level filter: $level_filter_clause"
-                
-                if [ -n "$filter_pipeline" ]; then
-                    # For complex pipelines, add as separate filter stage
-                    if echo "$filter_pipeline" | grep -q '|'; then
-                        filter_pipeline="$filter_pipeline | $level_filter_clause"
-                    else
-                        # For simple filters, combine with 'and'
-                        filter_pipeline="$filter_pipeline and $level_filter_clause"
-                    fi
-                else
-                    # Use level filter as the primary filter
-                    filter_pipeline="$level_filter_clause"
-                fi
             fi
             
             # Sorting handled by adding sort desc(timestamp) to pipeline
@@ -476,8 +453,7 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now (e.g., '5m', '15m', '30m', '1h')", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Filter specification. SIMPLE MODE: Use single term (e.g., '500', 'error') - searches in 'message' field by default. ADVANCED MODE: Use complete OPAL filter starting with 'filter'. CRITICAL: When user asks for '5xx errors' or 'server errors', you MUST expand to individual codes: 'filter message ~ \"500\" or message ~ \"501\" or message ~ \"502\" or message ~ \"503\" or message ~ \"504\" or message ~ \"505\"'. NEVER use literal '5xx' or '4xx' - they won't match. For '4xx errors': 'filter message ~ \"400\" or message ~ \"401\" or message ~ \"403\" or message ~ \"404\" or message ~ \"422\" or message ~ \"429\"'. SYNTAX: Use lowercase 'and'/'or', quote all values. FIELDS: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS.", required=False),
-                Arg(name="level", description="Log level filter (e.g., 'ERROR', 'WARN', 'INFO', 'DEBUG'). When specified, adds 'filter level ~ \"LEVEL\"' to the query. Commonly used with error queries - for 5xx server errors, use level='ERROR'. Can be combined with other filters.", required=False),
+                Arg(name="filter", description="Filter specification. SIMPLE: Use single term (e.g., '500', 'error') - searches message field. ADVANCED: Use OPAL syntax (e.g., 'filter message ~ \"500\" or message ~ \"501\"', 'filter message ~ \"500\" and level ~ \"ERROR\"'). For 5xx errors, use specific codes like '500' or '503', not literal '5xx'. Can filter by level (ERROR, WARN, INFO, DEBUG). Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags.", required=False),
                 Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Leave empty to get all fields (safer but slower).", required=False),
                 Arg(name="limit", description="Maximum number of records to return (default: 25, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
