@@ -125,11 +125,11 @@ class CLITools:
                 filter_pipeline=""
             fi
             
-            # Sorting handled via presentation.orderColumns for newest first
-            echo "🔧 Sorting: newest records first via presentation layer"
+            # Sorting handled by adding sort desc(timestamp) to pipeline
+            echo "🔧 Sorting: newest records first via sort desc(timestamp) in pipeline"
             
-            # Combine filter pipeline with field selection and limit
-            # Order: filter operations first, then field selection, then limit
+            # Combine filter pipeline with field selection, sort, and limit
+            # Order: filter operations first, then field selection, then sort desc(timestamp), then limit
             pipeline_parts=""
             
             # Add filter part if exists
@@ -143,6 +143,15 @@ class CLITools:
                     pipeline_parts="$pipeline_parts | $field_selection"
                 else
                     pipeline_parts="$field_selection"
+                fi
+            fi
+            
+            # Always add sort desc(timestamp) unless already present in the pipeline
+            if ! echo "$pipeline_parts" | grep -q 'sort.*desc.*timestamp'; then
+                if [ -n "$pipeline_parts" ]; then
+                    pipeline_parts="$pipeline_parts | sort desc(timestamp)"
+                else
+                    pipeline_parts="sort desc(timestamp)"
                 fi
             fi
             
@@ -185,12 +194,6 @@ class CLITools:
                             "input": $inputs,
                             "stageID": "main", 
                             "pipeline": $pipeline
-                        }]
-                    },
-                    "presentation": {
-                        "orderColumns": [{
-                            "columnName": "timestamp",
-                            "ascending": false
                         }]
                     }
                 }')
