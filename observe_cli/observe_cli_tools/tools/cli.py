@@ -121,9 +121,9 @@ class CLITools:
                 filter_pipeline=""
             fi
             
-            # Always sort by newest first for better UX
-            sort_clause="sort timestamp desc"
-            echo "🔧 Sorting: newest records first"
+            # Always sort by newest first for better UX using top command
+            sort_clause="top $limit_count by timestamp"
+            echo "🔧 Sorting: newest records first using top command"
             
             # Combine filter pipeline with field selection and sorting in correct order
             # Order: filter operations first, then field selection, then sorting, then limit
@@ -147,20 +147,19 @@ class CLITools:
             if echo "$filter_term" | grep -qE '\b(sort|top|bottom)\b'; then
                 echo "🔧 Sorting: detected in advanced filter - skipping automatic sort"
                 # Don't add our own sorting since it's already in the advanced filter
-            else
-                # Add our sorting clause
-                if [ -n "$pipeline_parts" ]; then
-                    pipeline_parts="$pipeline_parts | $sort_clause"
+                # Add limit at the end (unless already present)
+                if echo "$pipeline_parts" | grep -q 'limit'; then
+                    pipeline_str="$pipeline_parts"
                 else
-                    pipeline_parts="$sort_clause"
+                    pipeline_str="$pipeline_parts | limit $limit_count"
                 fi
-            fi
-            
-            # Add limit at the end (unless already present)
-            if echo "$pipeline_parts" | grep -q 'limit'; then
-                pipeline_str="$pipeline_parts"
             else
-                pipeline_str="$pipeline_parts | limit $limit_count"
+                # Add our sorting clause (top command includes the limit)
+                if [ -n "$pipeline_parts" ]; then
+                    pipeline_str="$pipeline_parts | $sort_clause"
+                else
+                    pipeline_str="$sort_clause"
+                fi
             fi
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
