@@ -121,12 +121,11 @@ class CLITools:
                 filter_pipeline=""
             fi
             
-            # Always sort by newest first for better UX using top command
-            sort_clause="top $limit_count by timestamp"
-            echo "🔧 Sorting: newest records first using top command"
+            # Sorting handled via presentation.orderColumns for newest first
+            echo "🔧 Sorting: newest records first via presentation layer"
             
-            # Combine filter pipeline with field selection and sorting in correct order
-            # Order: filter operations first, then field selection, then sorting, then limit
+            # Combine filter pipeline with field selection and limit
+            # Order: filter operations first, then field selection, then limit
             pipeline_parts=""
             
             # Add filter part if exists
@@ -143,22 +142,14 @@ class CLITools:
                 fi
             fi
             
-            # Add sorting (unless already present in advanced filter)
-            if echo "$filter_term" | grep -qE '\b(sort|top|bottom)\b'; then
-                echo "🔧 Sorting: detected in advanced filter - skipping automatic sort"
-                # Don't add our own sorting since it's already in the advanced filter
-                # Add limit at the end (unless already present)
-                if echo "$pipeline_parts" | grep -q 'limit'; then
-                    pipeline_str="$pipeline_parts"
-                else
-                    pipeline_str="$pipeline_parts | limit $limit_count"
-                fi
+            # Add limit at the end (unless already present)
+            if echo "$pipeline_parts" | grep -q 'limit'; then
+                pipeline_str="$pipeline_parts"
             else
-                # Add our sorting clause (top command includes the limit)
                 if [ -n "$pipeline_parts" ]; then
-                    pipeline_str="$pipeline_parts | $sort_clause"
+                    pipeline_str="$pipeline_parts | limit $limit_count"
                 else
-                    pipeline_str="$sort_clause"
+                    pipeline_str="limit $limit_count"
                 fi
             fi
             
@@ -190,6 +181,12 @@ class CLITools:
                             "input": $inputs,
                             "stageID": "main", 
                             "pipeline": $pipeline
+                        }]
+                    },
+                    "presentation": {
+                        "orderColumns": [{
+                            "columnName": "timestamp",
+                            "ascending": false
                         }]
                     }
                 }')
