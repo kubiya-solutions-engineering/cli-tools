@@ -10,11 +10,7 @@ class CLITools:
         """Initialize and register Observe API tools."""
         try:
             tools = [
-                self.execute_opal_query(),
-                self.query_builder(),
-                self.dataset_analyzer(),
-                self.performance_monitor(),
-                self.workspace_manager()
+                self.execute_opal_query()
             ]
             
             for tool in tools:
