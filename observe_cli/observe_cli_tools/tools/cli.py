@@ -86,6 +86,12 @@ class CLITools:
                 limit_count="25"
             fi
             
+            # Enforce maximum limit of 25 for performance and stability
+            if [ "$limit_count" -gt 25 ]; then
+                echo "⚠️  Requested limit ($limit_count) exceeds maximum allowed (25). Using limit=25"
+                limit_count="25"
+            fi
+            
             # Build field selection part of pipeline
             field_selection=""
             if [ -n "$fields" ]; then
