@@ -33,9 +33,16 @@ class CLITools:
             name="observe_opal_query",
             description=(
                 "Execute optimized OPAL queries on Observe datasets with flexible filtering options. Returns a limited number of recent records from the specified time interval. "
-                "Supports both simple single-field filtering and advanced multi-filter OPAL pipeline segments (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"'). "
+                "Supports both simple single-field filtering and advanced multi-filter OPAL pipeline segments. "
                 "Also supports field selection for performance optimization with large records. "
-                "Automatically uses dataset IDs from DATASET_IDS environment variable and tries both US and EU regional endpoints."
+                "Automatically uses dataset IDs from DATASET_IDS environment variable and tries both US and EU regional endpoints.\n\n"
+                "COMMON USE CASES:\n"
+                "• Find 5xx errors: filter='5xx' or filter='filter message ~ \"5[0-9][0-9]\"'\n"
+                "• Application-specific errors: filter='filter applicationName ~ \"my-service\" | filter level ~ \"ERROR\"'\n"
+                "• Recent timeouts: filter='timeout' with interval='1h'\n"
+                "• Host issues: filter='filter host ~ \"prod-server\"'\n\n"
+                "IMPORTANT: Available fields are timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. "
+                "There is NO 'status' field - HTTP status codes are in the 'message' field content."
             ),
             content="""
             #!/bin/sh
@@ -426,8 +433,8 @@ class CLITools:
                 Arg(name="interval", description="Time interval relative to now (e.g., '5m', '15m', '30m', '1h')", required=False),
                 Arg(name="start_time", description="Start time as ISO timestamp (inclusive)", required=False),
                 Arg(name="end_time", description="End time as ISO timestamp (exclusive)", required=False),
-                Arg(name="filter", description="Filter specification - supports both simple and advanced formats:\n• Simple: Single term to search for (e.g., 'error', 'push-api-configuration-service') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment with multiple filters (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n• Complex: Any OPAL operations like 'filter status >= 400 | stats count by endpoint | sort count desc'\nThe tool automatically detects format based on content (pipes, OPAL keywords, etc.). IMPORTANT: Filtering happens BEFORE field selection, so you can filter on any field in the original dataset even if it's not included in the 'fields' parameter.", required=False),
-                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Defaults to 'message' (log content). This parameter is only used when 'filter' is a simple search term, not when it contains OPAL pipeline syntax.", required=False),
+                Arg(name="filter", description="Filter specification - supports both simple and advanced formats. AVAILABLE FIELDS: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS.\n\n• Simple: Single term to search for (e.g., 'error', '5xx', 'timeout') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n\nCOMMON EXAMPLES:\n• HTTP 5xx errors: 'filter message ~ \"5[0-9][0-9]\"' or 'filter message ~ \"status.*5\"'\n• Application errors: 'filter applicationName ~ \"my-app\" | filter level ~ \"ERROR\"'\n• Recent timeouts: 'filter message ~ \"timeout\"'\n• Host-specific issues: 'filter host ~ \"prod-server-1\"'\n\nIMPORTANT: There is NO 'status' field - HTTP status codes are typically found in the 'message' field content. Use regex patterns or text matching to find status codes.", required=False),
+                Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Defaults to 'message' (log content).\n\nUSE CASES:\n• 'message' (default): Search log content for HTTP status codes, error messages, stack traces\n• 'applicationName': Filter by specific service/app names\n• 'level': Filter by log levels (INFO, WARN, ERROR, DEBUG)\n• 'host': Filter by server/container names\n• 'tags': Search structured tag data\n\nFor HTTP status codes like 5xx errors, use filter_type='message' with terms like '5xx', '500', 'Internal Server Error'.", required=False),
                 Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Leave empty to get all fields (safer but slower).", required=False),
                 Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
