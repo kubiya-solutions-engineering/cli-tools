@@ -32,16 +32,19 @@ class CLITools:
         return ObserveCLITool(
             name="observe_opal_query",
             description=(
-                "Execute optimized OPAL queries on Observe datasets with flexible filtering options. Returns a limited number of recent records from the specified time interval. "
+                "Execute optimized OPAL queries on Observe datasets with flexible filtering options. Returns records sorted by timestamp (newest first by default). "
                 "Supports both simple single-field filtering and advanced multi-filter OPAL pipeline segments. "
                 "Also supports field selection for performance optimization with large records. "
                 "Automatically uses dataset IDs from DATASET_IDS environment variable and tries both US and EU regional endpoints.\n\n"
+                "SORTING BEHAVIOR (NEW):\n"
+                "• Always returns newest records first\n"
+                "• When limit=10 and 50 results match, you get the 10 MOST RECENT records\n\n"
                 "COMMON USE CASES:\n"
-                "• Find 500 errors: filter='500' or filter='filter message ~ \"500\"'\n"
-                "• Find 502/503 errors: filter='502' or filter='503'\n"
-                "• Application-specific errors: filter='filter applicationName ~ \"my-service\" | filter level ~ \"ERROR\"'\n"
-                "• Recent timeouts: filter='timeout' with interval='1h'\n"
-                "• Host issues: filter='filter host ~ \"prod-server\"'\n\n"
+                "• Find recent 500 errors: filter='500' or filter='filter message ~ \"500\"'\n"
+                "• Find latest 502/503 errors: filter='502' or filter='503'\n"
+                "• Recent application errors: filter='filter applicationName ~ \"my-service\" | filter level ~ \"ERROR\"'\n"
+                "• Latest timeouts: filter='timeout' with interval='1h'\n"
+                "• Recent host issues: filter='filter host ~ \"prod-server\"'\n\n"
                 "IMPORTANT: Available fields are timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. "
                 "There is NO 'status' field - HTTP status codes are in the 'message' field content."
             ),
@@ -80,6 +83,7 @@ class CLITools:
             filter_term="$filter"
             filter_type="$filter_type"
             fields="$fields"
+
             # Clean up limit parameter by removing any control characters and whitespace
             limit_count=$(echo "$limit" | tr -d '[:cntrl:]' | tr -d '[:space:]')
             
@@ -89,7 +93,7 @@ class CLITools:
             fi
             
             if [ -z "$limit_count" ] || ! echo "$limit_count" | grep -qE '^[0-9]+$'; then
-                limit_count="500"  # Default limit for balanced performance and data volume
+                limit_count="25"
             fi
             
             # Build field selection part of pipeline
@@ -120,32 +124,50 @@ class CLITools:
                 else
                     # Simple filter - build traditional single filter
                     echo "🔧 Using simple filter: $filter_type ~ \"$filter_term\""
-                    filter_pipeline="filter $filter_type ~ \"$filter_term\" | limit $limit_count"
+                    filter_pipeline="filter $filter_type ~ \"$filter_term\""
                 fi
             else
-                # No filter, just limit
-                filter_pipeline="limit $limit_count"
+                # No filter, start with empty pipeline
+                filter_pipeline=""
             fi
             
-            # Combine filter pipeline with field selection in correct order
-            # Order: filter operations first, then field selection, then limit
-            if [ -n "$filter_term" ] && [ -n "$field_selection" ]; then
-                # Both filter and field selection - need to insert field selection before final limit
-                if echo "$filter_pipeline" | grep -q "| limit"; then
-                    # Replace "| limit X" with "| pick_col fields | limit X"
-                    # Extract the existing limit number, but always use our clean limit_count
-                    pipeline_str=$(echo "$filter_pipeline" | sed "s/| limit [0-9]*$/| $field_selection | limit $limit_count/")
-                else
-                    # No limit in filter pipeline, just append field selection
-                    pipeline_str="$filter_pipeline | $field_selection"
-                fi
-            elif [ -n "$field_selection" ]; then
-                # Only field selection, no filter
-                pipeline_str="$field_selection | limit $limit_count"
-            else
-                # Only filter or just limit
-                pipeline_str="$filter_pipeline"
+            # Always sort by newest first for better UX
+            sort_clause="sort timestamp desc"
+            echo "🔧 Sorting: newest records first"
+            
+            # Combine filter pipeline with field selection and sorting in correct order
+            # Order: filter operations first, then field selection, then sorting, then limit
+            pipeline_parts=""
+            
+            # Add filter part if exists
+            if [ -n "$filter_pipeline" ]; then
+                pipeline_parts="$filter_pipeline"
             fi
+            
+            # Add field selection if specified
+            if [ -n "$field_selection" ]; then
+                if [ -n "$pipeline_parts" ]; then
+                    pipeline_parts="$pipeline_parts | $field_selection"
+                else
+                    pipeline_parts="$field_selection"
+                fi
+            fi
+            
+            # Add sorting (unless already present in advanced filter)
+            if echo "$filter_term" | grep -qE '\b(sort|top|bottom)\b'; then
+                echo "🔧 Sorting: detected in advanced filter - skipping automatic sort"
+                # Don't add our own sorting since it's already in the advanced filter
+            else
+                # Add our sorting clause
+                if [ -n "$pipeline_parts" ]; then
+                    pipeline_parts="$pipeline_parts | $sort_clause"
+                else
+                    pipeline_parts="$sort_clause"
+                fi
+            fi
+            
+            # Add limit at the end
+            pipeline_str="$pipeline_parts | limit $limit_count"
             
             # Use jq to properly construct the input array and pipeline from dataset IDs  
             echo "🔧 Building query from dataset IDs: $DATASET_IDS"
@@ -437,7 +459,7 @@ class CLITools:
                 Arg(name="filter", description="Filter specification - supports both simple and advanced formats. AVAILABLE FIELDS: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS.\n\n• Simple: Single term to search for (e.g., 'error', '500', 'timeout') - searches in field specified by filter_type\n• Advanced: Full OPAL pipeline segment (e.g., 'filter applicationName ~ \"user-service\" | filter level ~ \"ERROR\"')\n\nCOMMON EXAMPLES:\n• HTTP 500 errors: 'filter message ~ \"500\"' or just '500'\n• HTTP 502/503 errors: 'filter message ~ \"502\"' or 'filter message ~ \"503\"'\n• Application errors: 'filter applicationName ~ \"my-app\" | filter level ~ \"ERROR\"'\n• Recent timeouts: 'filter message ~ \"timeout\"'\n• Host-specific issues: 'filter host ~ \"prod-server-1\"'\n\nIMPORTANT: There is NO 'status' field - HTTP status codes are typically found in the 'message' field content. Use simple string matching (not regex) for status codes.", required=False),
                 Arg(name="filter_type", description="Field to search in for simple filters only (ignored for advanced filters). Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Defaults to 'message' (log content).\n\nUSE CASES:\n• 'message' (default): Search log content for HTTP status codes, error messages, stack traces\n• 'applicationName': Filter by specific service/app names\n• 'level': Filter by log levels (INFO, WARN, ERROR, DEBUG)\n• 'host': Filter by server/container names\n• 'tags': Search structured tag data\n\nFor HTTP status codes, use filter_type='message' with specific codes like '500', '502', '503', or error text like 'Internal Server Error'.", required=False),
                 Arg(name="fields", description="Comma-separated list of specific fields to return (e.g., 'timestamp,applicationName,level,message'). Applied AFTER filtering, so you can filter on fields not included in this list. Use for performance optimization with large records. WARNING: Field names must be exact matches or the query will fail. Available fields: timestamp, applicationName, level, loggerName, host, message, sleuthSpanId, sleuthTraceId, tags, FIELDS. Leave empty to get all fields (safer but slower).", required=False),
-                Arg(name="limit", description="Maximum number of records to return (default: 500, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
+                Arg(name="limit", description="Maximum number of records to return (default: 25, balanced for performance and data volume). Ignored if limit is already specified in advanced filter format.", required=False)
             ],
             image="alpine:latest"
         )
