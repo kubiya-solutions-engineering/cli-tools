@@ -10,7 +10,8 @@ class CLITools:
         try:
             tools = [
                 self.list_monitors(),
-                self.search_metrics()
+                self.search_metrics(),
+                self.list_metrics()
             ]
             
             for tool in tools:
@@ -390,10 +391,101 @@ EOF
             """,
             args=[
                 Arg(name="operation", description="Operation to perform: 'search', 'query', or 'list'", required=True),
-                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Replace placeholders with actual values - use 'service:web-api' instead of '{service}', 'node:prod-1' instead of '{node}', etc. For 'by' clauses, use the actual tag value, not the tag name. Examples: 'avg:system.cpu.user', 'sum:nginx.requests{service:web-api}', 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}'", required=False),
+                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Replace placeholders with actual values - FOR EXAMPLE use 'service:web-api' instead of '{service}', 'node:prod-1' instead of '{node}', etc. For 'by' clauses, use the actual tag value, not the tag name. Examples: 'avg:system.cpu.user', 'sum:nginx.requests{*} by {web-api}', 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}'", required=False),
                 Arg(name="start_time", description="For 'query': Unix timestamp for start time (optional, defaults to 1 hour ago)", required=False),
                 Arg(name="end_time", description="For 'query': Unix timestamp for end time (optional, defaults to now)", required=False)
             ],
+            image="python:3.9-slim"
+        )
+
+    def list_metrics(self) -> DatadogCLITool:
+        """List all Datadog metrics - simple and straightforward."""
+        
+        return DatadogCLITool(
+            name="datadog_list_metrics",
+            description="List all Datadog metrics. Simple tool that shows every single metric available.",
+            content="""
+            set -e  # Exit on any error
+
+            # Install required packages
+            echo "Installing required packages..."
+            pip install requests > /dev/null 2>&1
+            echo "✅ Required packages installed"
+
+            # Create simple Python script
+            cat << 'EOF' > /tmp/list_all_metrics.py
+import requests
+import sys
+import os
+from datetime import datetime, timedelta
+
+# Get credentials
+api_key = os.environ.get('DD_API_KEY')
+app_key = os.environ.get('DD_APP_KEY')
+site = os.environ.get('DD_SITE', 'api.datadoghq.com')
+
+if not api_key or not app_key:
+    print("❌ Error: DD_API_KEY and DD_APP_KEY environment variables are required")
+    sys.exit(1)
+
+# Setup API
+if site.startswith('http://') or site.startswith('https://'):
+    base_url = site
+else:
+    base_url = f"https://{site}"
+
+headers = {
+    "DD-API-KEY": api_key,
+    "DD-APPLICATION-KEY": app_key,
+    "Content-Type": "application/json"
+}
+
+# Get all metrics from last 24 hours
+print("🔍 Fetching all metrics...")
+url = f"{base_url}/api/v1/metrics"
+from_time = int((datetime.now() - timedelta(hours=24)).timestamp())
+params = {"from": from_time}
+
+try:
+    response = requests.get(url, headers=headers, params=params, timeout=60)
+    response.raise_for_status()
+    
+    data = response.json()
+    metrics = data.get('metrics', [])
+    
+    print(f"📊 Found {len(metrics)} metrics:")
+    print("=" * 50)
+    
+    # Just list them all, one per line
+    for metric in sorted(metrics):
+        print(metric)
+        
+except Exception as e:
+    print(f"❌ Error: {str(e)}")
+    sys.exit(1)
+EOF
+
+            echo "=== Listing All Datadog Metrics ==="
+            echo "Timestamp: $(date)"
+            echo ""
+
+            # Execute the script
+            python /tmp/list_all_metrics.py
+            exit_code=$?
+
+            if [ $exit_code -eq 0 ]; then
+                echo ""
+                echo "✅ All metrics listed successfully"
+            else
+                echo ""
+                echo "❌ Failed to list metrics"
+                exit $exit_code
+            fi
+
+            # Clean up
+            rm -f /tmp/list_all_metrics.py
+            """,
+            args=[],
             image="python:3.9-slim"
         )
 

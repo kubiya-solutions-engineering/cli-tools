@@ -126,6 +126,30 @@ export DD_SITE="datadoghq.com"
 
 ### 3️⃣ Start Using
 
+#### Using Specialized Tools
+
+**List all active metrics:**
+```
+datadog_list_metrics --mode active
+```
+
+**Search for specific metrics:**
+```
+datadog_list_metrics --mode search --query "system.cpu"
+```
+
+**List metrics with filtering:**
+```
+datadog_list_metrics --mode active --name_filter "cpu" --hours 6
+```
+
+**List metric namespaces:**
+```
+datadog_list_metrics --mode namespaces
+```
+
+#### Using Standard CLI Commands
+
 Example commands:
 ```
 "monitor list"
@@ -135,9 +159,35 @@ Example commands:
 "service list"
 ```
 
+## 🛠️ Available Tools
+
+This module provides several specialized tools for Datadog operations:
+
+### 📊 Metrics Management
+- **`datadog_list_metrics`** - Comprehensive metrics listing with filtering and grouping
+  - List active metrics from the last N hours
+  - Search metrics by name pattern
+  - Filter by tags and namespaces
+  - Group metrics by prefixes for better organization
+  - Detailed metric metadata and information
+
+### 📈 Monitor Management  
+- **`datadog_list_monitors`** - List Datadog monitors with intelligent filtering
+  - Filter by monitor states (alert, warn, no_data)
+  - Search by monitor name
+  - Filter by scope tags and monitor tags
+  - Timeout protection for large datasets
+
+### 🔍 Metrics Search & Query
+- **`datadog_search_metrics`** - Search and query Datadog metrics using the API
+  - Search for metrics by name/pattern
+  - Query timeseries data for specific metrics
+  - List active metrics from specified time ranges
+  - Support for complex metric queries with tags
+
 ## 📚 Available Commands
 
-The Datadog CLI wrapper supports all standard Datadog CLI commands:
+The Datadog CLI wrapper also supports all standard Datadog CLI commands:
 
 ### Monitor Commands
 - `monitor list` - List monitors
