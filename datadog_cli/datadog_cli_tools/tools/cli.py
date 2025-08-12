@@ -157,7 +157,11 @@ class DatadogMetricsAPI:
             print("❌ Error: DD_API_KEY and DD_APP_KEY environment variables are required")
             sys.exit(1)
         
-        self.base_url = f"https://{self.site}"
+        # Handle both full URLs and hostname-only formats
+        if self.site.startswith('http://') or self.site.startswith('https://'):
+            self.base_url = self.site
+        else:
+            self.base_url = f"https://{self.site}"
         self.headers = {
             "DD-API-KEY": self.api_key,
             "DD-APPLICATION-KEY": self.app_key,
