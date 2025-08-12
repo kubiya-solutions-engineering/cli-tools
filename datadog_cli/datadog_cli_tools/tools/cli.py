@@ -3,14 +3,15 @@ from .base import DatadogCLITool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 
 class CLITools:
-    """Datadog CLI wrapper tools."""
+    """Datadog API and CLI wrapper tools."""
 
     def __init__(self):
-        """Initialize and register all Datadog CLI tools."""
+        """Initialize and register all Datadog API tools."""
         try:
             tools = [
                 self.run_cli_command(),
-                self.list_monitors()
+                self.list_monitors(),
+                self.search_metrics()
             ]
             
             for tool in tools:
@@ -23,171 +24,6 @@ class CLITools:
         except Exception as e:
             print(f"❌ Failed to register Datadog CLI tools: {str(e)}", file=sys.stderr)
             raise
-
-    def run_cli_command(self) -> DatadogCLITool:
-        """Execute any Datadog CLI command."""
-        
-        return DatadogCLITool(
-            name="datadog_cli_command",
-            description="Execute any Datadog CLI command with full functionality using Dogshell",
-            content="""
-            set -e  # Exit on any error
-
-            # Install datadog package if not already installed
-            echo "Installing datadog package..."
-            sleep 1
-            pip install datadog
-            sleep 2
-            echo "✅ Datadog package installed successfully"
-            
-            # Validate required parameters first
-            if [ -z "$command" ]; then
-                echo "❌ Error: Command is required"
-                echo ""
-                echo "Usage: Provide a Dogshell command (e.g., 'monitor show_all', 'dashboard list')"
-                echo ""
-                echo "Common commands:"
-                echo "  • monitor show_all      - Show all monitors"
-                echo "  • monitor show <id>     - Show specific monitor"
-                echo "  • dashboard list        - List all dashboards"
-                echo "  • metric post           - Post a metric"
-                echo "  • event post            - Post an event"
-                echo "  • host list             - List hosts"
-                echo "  • tag list              - List tags"
-                echo "  • search                - Search metrics/events"
-                echo "  • comment post          - Post a comment"
-                echo ""
-                echo "💡 For large datasets, use filters to improve performance:"
-                echo ""
-                echo "Monitor filtering examples:"
-                echo "  • monitor show_all --group_states alert,warn"
-                echo "    └── Only show monitors currently alerting or warning"
-                echo "  • monitor show_all --name 'api'"
-                echo "    └── Only show monitors with 'api' in the name"
-                echo "  • monitor show_all --tags 'env:production'"
-                echo "    └── Only show monitors for production environment"
-                echo "  • monitor show_all --monitor_tags 'team:backend'"
-                echo "    └── Only show monitors tagged with team:backend"
-                echo "  • monitor show_all --group_states alert --tags 'service:api'"
-                echo "    └── Combine filters for more specific results"
-                echo ""
-                echo "Available group_states: all, alert, warn, no_data"
-                echo "Tags format: 'key:value' or 'key:value,key2:value2'"
-                exit 1
-            fi
-            
-            # Find the dog command
-            echo "Locating dog command..."
-            DOG_CMD=""
-            
-            # Check if dog is in PATH
-            if command -v dog &> /dev/null; then
-                DOG_CMD="dog"
-                echo "✅ Found dog command in PATH"
-            else
-                # Try to find dog in common locations
-                PYTHON_DIR="$(dirname $(which python))"
-                if [ -f "$PYTHON_DIR/dog" ] && [ -x "$PYTHON_DIR/dog" ]; then
-                    DOG_CMD="$PYTHON_DIR/dog"
-                    echo "✅ Found dog command at: $PYTHON_DIR/dog"
-                else
-                    # Try using python module directly
-                    if python -c "import datadog.dogshell" &> /dev/null; then
-                        DOG_CMD="python -m datadog.dogshell"
-                        echo "✅ Using python module: datadog.dogshell"
-                    else
-                        echo "❌ Error: Could not locate dog command or datadog.dogshell module"
-                        exit 1
-                    fi
-                fi
-            fi
-            
-            echo "=== Executing Datadog Command ==="
-            echo "Command: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 $command"
-            echo "Timestamp: $(date)"
-            echo ""
-            
-            # Execute the command with timeout and proper output handling
-            echo "Executing command..."
-            
-            # Use a more reliable execution method
-            set +e  # Don't exit on error so we can handle it
-            
-            # Execute with timeout and capture output
-            timeout 180 $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 $command 2>&1
-            exit_code=$?
-            
-            # Handle the results
-            if [ $exit_code -eq 124 ]; then
-                echo ""
-                echo "❌ Command timed out after 180 seconds"
-                echo ""
-                echo "💡 This might indicate:"
-                echo "  • Authentication issues (check DD_API_KEY, DD_APP_KEY)"
-                echo "  • Network connectivity problems"
-                echo "  • Invalid command syntax"
-                echo "  • Datadog API is slow to respond"
-                echo "  • Large dataset - consider using filters or pagination"
-                echo ""
-                if [[ "$command" == *"monitor show_all"* ]]; then
-                    echo "💡 For monitor show_all, try filtering to reduce dataset size:"
-                    echo "  • --group_states alert,warn (only alerting monitors)"
-                    echo "  • --name 'search_term' (filter by monitor name)"
-                    echo "  • --tags 'env:production' (filter by scope tags)"
-                    echo "  • --monitor_tags 'team:backend' (filter by monitor tags)"
-                    echo ""
-                fi
-                exit 1
-            elif [ $exit_code -eq 0 ]; then
-                echo ""
-                echo "✅ Command executed successfully"
-            else
-                echo ""
-                echo "❌ Command failed with exit code $exit_code"
-                echo ""
-                echo "💡 Troubleshooting tips:"
-                
-                # Provide specific help based on common issues
-                if [ $exit_code -eq 1 ]; then
-                    echo "  • Check command syntax: $DOG_CMD --application-key ${DD_APP_KEY} --api-key ${DD_API_KEY} --api_host ${DD_SITE} --timeout 120 $command"
-                    echo "  • Verify authentication credentials"
-                    echo "  • Use '$DOG_CMD -h' to see available commands"
-                elif [ $exit_code -eq 2 ]; then
-                    echo "  • Command not found or invalid syntax"
-                    echo "  • Use '$DOG_CMD -h' to see available commands"
-                else
-                    echo "  • Check your Datadog API credentials"
-                    echo "  • Verify network connectivity"
-                    echo "  • Check command syntax and parameters"
-                fi
-                
-                echo ""
-                echo "💡 Common commands:"
-                echo "  • monitor show_all"
-                echo "  • monitor show <id>"
-                echo "  • dashboard list"
-                echo "  • metric post"
-                echo "  • event post"
-                echo "  • host list"
-                echo "  • tag list"
-                
-                if [[ "$command" == *"monitor show_all"* ]]; then
-                    echo ""
-                    echo "💡 For monitor show_all, consider using filters:"
-                    echo "  • --group_states alert,warn"
-                    echo "  • --name 'search_term'"
-                    echo "  • --tags 'key:value'"
-                    echo "  • --monitor_tags 'key:value'"
-                fi
-                
-                exit $exit_code
-            fi
-            """,
-            args=[
-                Arg(name="command", description="The command to pass to dog (e.g., 'monitor show_all', 'metric post', 'event post')", required=True)
-            ],
-            image="python:3.9-slim"
-        )
 
     def list_monitors(self) -> DatadogCLITool:
         """List Datadog monitors with intelligent filtering options."""
@@ -286,6 +122,255 @@ class CLITools:
                     description="Filter by monitor tags. Format: 'key:value' or 'key1:value1,key2:value2'. Examples: 'team:backend', 'priority:high,team:frontend'. These are tags applied to the monitors themselves.",
                     required=False
                 )
+            ],
+            image="python:3.9-slim"
+        )
+
+    def search_metrics(self) -> DatadogCLITool:
+        """Search and query Datadog metrics using the API."""
+        
+        return DatadogCLITool(
+            name="datadog_search_metrics",
+            description="Search and query Datadog metrics using the API. Supports metric search, timeseries queries, and active metric listing.",
+            content="""
+            set -e  # Exit on any error
+
+            # Install required packages
+            echo "Installing required packages..."
+            pip install requests > /dev/null 2>&1
+            echo "✅ Required packages installed"
+
+            # Create Python script for API calls
+            cat << 'EOF' > /tmp/datadog_metrics.py
+import requests
+import json
+import sys
+import os
+from datetime import datetime, timedelta
+
+class DatadogMetricsAPI:
+    def __init__(self):
+        self.api_key = os.environ.get('DD_API_KEY')
+        self.app_key = os.environ.get('DD_APP_KEY')
+        self.site = os.environ.get('DD_SITE', 'api.datadoghq.com')
+        
+        if not self.api_key or not self.app_key:
+            print("❌ Error: DD_API_KEY and DD_APP_KEY environment variables are required")
+            sys.exit(1)
+        
+        self.base_url = f"https://{self.site}"
+        self.headers = {
+            "DD-API-KEY": self.api_key,
+            "DD-APPLICATION-KEY": self.app_key,
+            "Content-Type": "application/json"
+        }
+
+    def search_metrics(self, query):
+        # Search for metrics by name/pattern
+        url = f"{self.base_url}/api/v1/search"
+        params = {"q": f"metrics:{query}"}
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            metrics = data.get('results', {}).get('metrics', [])
+            
+            print(f"Found {len(metrics)} metrics matching '{query}':")
+            print("=" * 50)
+            for metric in metrics:
+                print(f"📊 {metric}")
+            
+            return metrics
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error searching metrics: {str(e)}")
+            sys.exit(1)
+
+    def query_timeseries(self, query, start_time=None, end_time=None):
+        # Query timeseries data for a metric
+        url = f"{self.base_url}/api/v1/query"
+        
+        # Default to last hour if no time range specified
+        if not end_time:
+            end_time = int(datetime.now().timestamp())
+        if not start_time:
+            start_time = int((datetime.now() - timedelta(hours=1)).timestamp())
+        
+        params = {
+            "query": query,
+            "from": start_time,
+            "to": end_time
+        }
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            print(f"Query: {query}")
+            print(f"Time range: {datetime.fromtimestamp(start_time)} to {datetime.fromtimestamp(end_time)}")
+            print("=" * 70)
+            
+            if 'series' in data and data['series']:
+                for series in data['series']:
+                    print(f"📈 Metric: {series.get('metric', 'Unknown')}")
+                    if series.get('tag_set'):
+                        print(f"   Tags: {', '.join(series['tag_set'])}")
+                    
+                    points = series.get('pointlist', [])
+                    if points:
+                        print(f"   Data points: {len(points)}")
+                        print(f"   Latest value: {points[-1][1]} at {datetime.fromtimestamp(points[-1][0]/1000)}")
+                        
+                        # Show first few and last few points if many
+                        if len(points) > 10:
+                            print("   Sample points:")
+                            for i, (timestamp, value) in enumerate(points[:3]):
+                                print(f"     {datetime.fromtimestamp(timestamp/1000)}: {value}")
+                            print("     ...")
+                            for i, (timestamp, value) in enumerate(points[-3:]):
+                                print(f"     {datetime.fromtimestamp(timestamp/1000)}: {value}")
+                        else:
+                            print("   All points:")
+                            for timestamp, value in points:
+                                print(f"     {datetime.fromtimestamp(timestamp/1000)}: {value}")
+                    print()
+            else:
+                print("No data found for the specified query and time range.")
+            
+            return data
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error querying timeseries: {str(e)}")
+            sys.exit(1)
+
+    def list_active_metrics(self, hours_ago=24):
+        # List active metrics from the last N hours
+        url = f"{self.base_url}/api/v1/metrics"
+        from_time = int((datetime.now() - timedelta(hours=hours_ago)).timestamp())
+        
+        params = {"from": from_time}
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            metrics = data.get('metrics', [])
+            
+            print(f"Found {len(metrics)} active metrics from the last {hours_ago} hours:")
+            print("=" * 60)
+            
+            # Group metrics by common prefixes for better readability
+            metric_groups = {}
+            for metric in metrics:
+                prefix = metric.split('.')[0] if '.' in metric else metric
+                if prefix not in metric_groups:
+                    metric_groups[prefix] = []
+                metric_groups[prefix].append(metric)
+            
+            for prefix, group_metrics in sorted(metric_groups.items()):
+                print(f"\\n📊 {prefix}.* ({len(group_metrics)} metrics):")
+                for metric in sorted(group_metrics):
+                    print(f"   - {metric}")
+            
+            return metrics
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error listing active metrics: {str(e)}")
+            sys.exit(1)
+
+def main():
+    operation = sys.argv[1] if len(sys.argv) > 1 else ""
+    api = DatadogMetricsAPI()
+    
+    if operation == "search":
+        if len(sys.argv) < 3:
+            print("Usage: search <query>")
+            sys.exit(1)
+        query = sys.argv[2]
+        api.search_metrics(query)
+        
+    elif operation == "query":
+        if len(sys.argv) < 3:
+            print("Usage: query <metric_query> [start_timestamp] [end_timestamp]")
+            sys.exit(1)
+        query = sys.argv[2]
+        start_time = int(sys.argv[3]) if len(sys.argv) > 3 else None
+        end_time = int(sys.argv[4]) if len(sys.argv) > 4 else None
+        api.query_timeseries(query, start_time, end_time)
+        
+    elif operation == "list":
+        hours = int(sys.argv[2]) if len(sys.argv) > 2 else 24
+        api.list_active_metrics(hours)
+        
+    else:
+        print("Usage: python script.py <operation> [arguments]")
+        print("Operations:")
+        print("  search <query>                    - Search for metrics by name/pattern")
+        print("  query <metric_query> [start] [end] - Query timeseries data")
+        print("  list [hours]                     - List active metrics (default: 24h)")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+EOF
+
+            # Validate required parameters
+            if [ -z "$operation" ]; then
+                echo "❌ Error: Operation is required"
+                echo ""
+                echo "Usage: Specify the operation to perform"
+                echo ""
+                echo "Available operations:"
+                echo "  • search <query>                    - Search for metrics by name/pattern"
+                echo "  • query <metric_query> [start] [end] - Query timeseries data for metrics"
+                echo "  • list [hours]                     - List active metrics (default: last 24 hours)"
+                echo ""
+                echo "Examples:"
+                echo "  • search 'cpu'                     - Find all metrics containing 'cpu'"
+                echo "  • query 'avg:system.cpu.user'      - Get CPU user time data"
+                echo "  • query 'sum:nginx.requests{*}'    - Get nginx request count"
+                echo "  • list                             - List all active metrics from last 24h"
+                echo "  • list 6                           - List metrics from last 6 hours"
+                exit 1
+            fi
+
+            echo "=== Datadog Metrics API Operation ==="
+            echo "Operation: $operation"
+            echo "Timestamp: $(date)"
+            echo "API Host: ${DD_SITE}"
+            echo ""
+
+            # Execute the Python script
+            python /tmp/datadog_metrics.py $operation $query $start_time $end_time
+            exit_code=$?
+
+            if [ $exit_code -eq 0 ]; then
+                echo ""
+                echo "✅ Operation completed successfully"
+            else
+                echo ""
+                echo "❌ Operation failed with exit code $exit_code"
+                echo ""
+                echo "💡 Troubleshooting tips:"
+                echo "  • Check your DD_API_KEY and DD_APP_KEY credentials"
+                echo "  • Verify DD_SITE is correct for your region"
+                echo "  • Ensure you have proper permissions for the API"
+                echo "  • Check metric names and query syntax"
+                exit $exit_code
+            fi
+
+            # Clean up
+            rm -f /tmp/datadog_metrics.py
+            """,
+            args=[
+                Arg(name="operation", description="Operation to perform: 'search', 'query', or 'list'", required=True),
+                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query (e.g., 'avg:system.cpu.user', 'sum:nginx.requests{*}')", required=False),
+                Arg(name="start_time", description="For 'query': Unix timestamp for start time (optional, defaults to 1 hour ago)", required=False),
+                Arg(name="end_time", description="For 'query': Unix timestamp for end time (optional, defaults to now)", required=False)
             ],
             image="python:3.9-slim"
         )
