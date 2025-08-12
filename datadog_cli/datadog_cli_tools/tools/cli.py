@@ -9,7 +9,6 @@ class CLITools:
         """Initialize and register all Datadog API tools."""
         try:
             tools = [
-                self.run_cli_command(),
                 self.list_monitors(),
                 self.search_metrics()
             ]
