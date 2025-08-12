@@ -331,9 +331,16 @@ EOF
                 echo "Examples:"
                 echo "  • search --query 'cpu'             - Find all metrics containing 'cpu'"
                 echo "  • query --query 'avg:system.cpu.user' - Get CPU user time data"
-                echo "  • query --query 'sum:nginx.requests{*}' --start_time -3600 - Get nginx request count for last hour"
+                echo "  • query --query 'sum:nginx.requests{service:web-api}' --start_time -3600 - Get nginx request count for web-api service"
+                echo "  • query --query 'avg:kubernetes.cpu.usage.total{node:prod-worker-1} by {node}' --start_time -3600 - Get CPU usage by node"
                 echo "  • list                             - List all active metrics from last 24h"
                 echo "  • list --hours 6                   - List metrics from last 6 hours"
+                echo ""
+                echo "💡 Note: When using queries from knowledge base, replace placeholders:"
+                echo "  • {service} → service:actual-service-name"
+                echo "  • {node} → node:actual-node-name"
+                echo "  • {container_name} → container_name:actual-container-name"
+                echo "  • {*} → specific tags like env:production,region:us-east-1"
                 exit 1
             fi
 
@@ -382,7 +389,7 @@ EOF
             """,
             args=[
                 Arg(name="operation", description="Operation to perform: 'search', 'query', or 'list'", required=True),
-                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query (e.g., 'avg:system.cpu.user', 'sum:nginx.requests{*}')", required=False),
+                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Replace placeholders with actual values - use 'service:web-api' instead of '{service}', 'node:prod-1' instead of '{node}', etc. Examples: 'avg:system.cpu.user', 'sum:nginx.requests{service:web-api}', 'avg:kubernetes.cpu.usage.total{node:prod-worker-1} by {node}'", required=False),
                 Arg(name="start_time", description="For 'query': Unix timestamp for start time (optional, defaults to 1 hour ago)", required=False),
                 Arg(name="end_time", description="For 'query': Unix timestamp for end time (optional, defaults to now)", required=False)
             ],
