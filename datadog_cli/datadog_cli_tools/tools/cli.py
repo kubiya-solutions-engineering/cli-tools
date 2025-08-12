@@ -145,6 +145,7 @@ import requests
 import json
 import sys
 import os
+import argparse
 from datetime import datetime, timedelta
 
 class DatadogMetricsAPI:
@@ -286,36 +287,31 @@ class DatadogMetricsAPI:
             sys.exit(1)
 
 def main():
-    operation = sys.argv[1] if len(sys.argv) > 1 else ""
+    parser = argparse.ArgumentParser(description='Datadog Metrics API Tool')
+    parser.add_argument('--operation', required=True, choices=['search', 'query', 'list'],
+                       help='Operation to perform: search, query, or list')
+    parser.add_argument('--query', help='For search: metric name pattern. For query: timeseries query')
+    parser.add_argument('--start_time', type=int, help='For query: Unix timestamp for start time')
+    parser.add_argument('--end_time', type=int, help='For query: Unix timestamp for end time')
+    parser.add_argument('--hours', type=int, default=24, help='For list: hours to look back (default: 24)')
+    
+    args = parser.parse_args()
     api = DatadogMetricsAPI()
     
-    if operation == "search":
-        if len(sys.argv) < 3:
-            print("Usage: search <query>")
+    if args.operation == "search":
+        if not args.query:
+            print("❌ Error: --query is required for search operation")
             sys.exit(1)
-        query = sys.argv[2]
-        api.search_metrics(query)
+        api.search_metrics(args.query)
         
-    elif operation == "query":
-        if len(sys.argv) < 3:
-            print("Usage: query <metric_query> [start_timestamp] [end_timestamp]")
+    elif args.operation == "query":
+        if not args.query:
+            print("❌ Error: --query is required for query operation")
             sys.exit(1)
-        query = sys.argv[2]
-        start_time = int(sys.argv[3]) if len(sys.argv) > 3 else None
-        end_time = int(sys.argv[4]) if len(sys.argv) > 4 else None
-        api.query_timeseries(query, start_time, end_time)
+        api.query_timeseries(args.query, args.start_time, args.end_time)
         
-    elif operation == "list":
-        hours = int(sys.argv[2]) if len(sys.argv) > 2 else 24
-        api.list_active_metrics(hours)
-        
-    else:
-        print("Usage: python script.py <operation> [arguments]")
-        print("Operations:")
-        print("  search <query>                    - Search for metrics by name/pattern")
-        print("  query <metric_query> [start] [end] - Query timeseries data")
-        print("  list [hours]                     - List active metrics (default: 24h)")
-        sys.exit(1)
+    elif args.operation == "list":
+        api.list_active_metrics(args.hours)
 
 if __name__ == "__main__":
     main()
@@ -328,16 +324,16 @@ EOF
                 echo "Usage: Specify the operation to perform"
                 echo ""
                 echo "Available operations:"
-                echo "  • search <query>                    - Search for metrics by name/pattern"
-                echo "  • query <metric_query> [start] [end] - Query timeseries data for metrics"
-                echo "  • list [hours]                     - List active metrics (default: last 24 hours)"
+                echo "  • search --query <pattern>         - Search for metrics by name/pattern"
+                echo "  • query --query <metric_query> [--start_time <timestamp>] [--end_time <timestamp>] - Query timeseries data"
+                echo "  • list [--hours <number>]          - List active metrics (default: last 24 hours)"
                 echo ""
                 echo "Examples:"
-                echo "  • search 'cpu'                     - Find all metrics containing 'cpu'"
-                echo "  • query 'avg:system.cpu.user'      - Get CPU user time data"
-                echo "  • query 'sum:nginx.requests{*}'    - Get nginx request count"
+                echo "  • search --query 'cpu'             - Find all metrics containing 'cpu'"
+                echo "  • query --query 'avg:system.cpu.user' - Get CPU user time data"
+                echo "  • query --query 'sum:nginx.requests{*}' --start_time -3600 - Get nginx request count for last hour"
                 echo "  • list                             - List all active metrics from last 24h"
-                echo "  • list 6                           - List metrics from last 6 hours"
+                echo "  • list --hours 6                   - List metrics from last 6 hours"
                 exit 1
             fi
 
@@ -347,8 +343,23 @@ EOF
             echo "API Host: ${DD_SITE}"
             echo ""
 
-            # Execute the Python script
-            python /tmp/datadog_metrics.py $operation $query $start_time $end_time
+            # Build command with named arguments, only including non-empty values
+            CMD="python /tmp/datadog_metrics.py --operation \"$operation\""
+            
+            if [ -n "$query" ]; then
+                CMD="$CMD --query \"$query\""
+            fi
+            
+            if [ -n "$start_time" ]; then
+                CMD="$CMD --start_time \"$start_time\""
+            fi
+            
+            if [ -n "$end_time" ]; then
+                CMD="$CMD --end_time \"$end_time\""
+            fi
+            
+            # Execute the Python script with named arguments
+            eval $CMD
             exit_code=$?
 
             if [ $exit_code -eq 0 ]; then
