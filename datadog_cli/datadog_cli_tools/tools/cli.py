@@ -434,11 +434,11 @@ EOF
         )
 
     def list_metrics(self) -> DatadogCLITool:
-        """List all Datadog metrics - simple and straightforward."""
+        """List all Datadog metrics with optional filtering."""
         
         return DatadogCLITool(
             name="datadog_list_metrics",
-            description="List all Datadog metrics. Simple tool that shows every single metric available.",
+            description="List all Datadog metrics with optional filtering. Use the filter argument to show only metrics containing a specific substring.",
             content="""
             set -e  # Exit on any error
 
@@ -452,65 +452,120 @@ EOF
 import requests
 import sys
 import os
+import argparse
 from datetime import datetime, timedelta
 
-# Get credentials
-api_key = os.environ.get('DD_API_KEY')
-app_key = os.environ.get('DD_APP_KEY')
-site = os.environ.get('DD_SITE', 'api.datadoghq.com')
+def main():
+    parser = argparse.ArgumentParser(description='List Datadog Metrics with Filtering')
+    parser.add_argument('--filter', help='Filter metrics to only show those containing this substring (case-insensitive)')
+    parser.add_argument('--hours', type=int, default=24, help='Hours to look back for active metrics (default: 24)')
+    args = parser.parse_args()
 
-if not api_key or not app_key:
-    print("❌ Error: DD_API_KEY and DD_APP_KEY environment variables are required")
-    sys.exit(1)
+    # Get credentials
+    api_key = os.environ.get('DD_API_KEY')
+    app_key = os.environ.get('DD_APP_KEY')
+    site = os.environ.get('DD_SITE', 'api.datadoghq.com')
 
-# Setup API
-if site.startswith('http://') or site.startswith('https://'):
-    base_url = site
-else:
-    base_url = f"https://{site}"
+    if not api_key or not app_key:
+        print("❌ Error: DD_API_KEY and DD_APP_KEY environment variables are required")
+        sys.exit(1)
 
-headers = {
-    "DD-API-KEY": api_key,
-    "DD-APPLICATION-KEY": app_key,
-    "Content-Type": "application/json"
-}
+    # Setup API
+    if site.startswith('http://') or site.startswith('https://'):
+        base_url = site
+    else:
+        base_url = f"https://{site}"
 
-# Get all metrics from last 24 hours
-print("🔍 Fetching all metrics...")
-url = f"{base_url}/api/v1/metrics"
-from_time = int((datetime.now() - timedelta(hours=24)).timestamp())
-params = {"from": from_time}
+    headers = {
+        "DD-API-KEY": api_key,
+        "DD-APPLICATION-KEY": app_key,
+        "Content-Type": "application/json"
+    }
 
-try:
-    response = requests.get(url, headers=headers, params=params, timeout=60)
-    response.raise_for_status()
-    
-    data = response.json()
-    metrics = data.get('metrics', [])
-    
-    print(f"📊 Found {len(metrics)} metrics:")
-    print("=" * 50)
-    
-    # Just list them all, one per line
-    for metric in sorted(metrics):
-        print(metric)
+    # Get all metrics from specified time range
+    print(f"🔍 Fetching metrics from the last {args.hours} hours...")
+    url = f"{base_url}/api/v1/metrics"
+    from_time = int((datetime.now() - timedelta(hours=args.hours)).timestamp())
+    params = {"from": from_time}
+
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=60)
+        response.raise_for_status()
         
-except Exception as e:
-    print(f"❌ Error: {str(e)}")
-    sys.exit(1)
+        data = response.json()
+        all_metrics = data.get('metrics', [])
+        
+        # Apply filter if specified
+        if args.filter:
+            filter_lower = args.filter.lower()
+            filtered_metrics = [metric for metric in all_metrics if filter_lower in metric.lower()]
+            metrics = filtered_metrics
+            print(f"📊 Found {len(metrics)} metrics containing '{args.filter}' (out of {len(all_metrics)} total):")
+        else:
+            metrics = all_metrics
+            print(f"📊 Found {len(metrics)} metrics:")
+        
+        print("=" * 60)
+        
+        if not metrics:
+            if args.filter:
+                print(f"❌ No metrics found containing '{args.filter}'")
+                print("💡 Try a different filter term or check the spelling")
+            else:
+                print("❌ No metrics found in the specified time range")
+        else:
+            # Group metrics by common prefixes for better readability
+            metric_groups = {}
+            for metric in metrics:
+                prefix = metric.split('.')[0] if '.' in metric else metric
+                if prefix not in metric_groups:
+                    metric_groups[prefix] = []
+                metric_groups[prefix].append(metric)
+            
+            # Sort and display
+            for prefix, group_metrics in sorted(metric_groups.items()):
+                print(f"\\n📊 {prefix}.* ({len(group_metrics)} metrics):")
+                for metric in sorted(group_metrics):
+                    print(f"   - {metric}")
+            
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 EOF
 
-            echo "=== Listing All Datadog Metrics ==="
+            echo "=== Listing Datadog Metrics ==="
             echo "Timestamp: $(date)"
+            if [ -n "$filter" ]; then
+                echo "Filter: $filter"
+            fi
+            if [ -n "$hours" ]; then
+                echo "Time range: Last $hours hours"
+            else
+                echo "Time range: Last 24 hours"
+            fi
             echo ""
 
+            # Build command with arguments
+            CMD="python /tmp/list_all_metrics.py"
+            
+            if [ -n "$filter" ]; then
+                CMD="$CMD --filter \"$filter\""
+            fi
+            
+            if [ -n "$hours" ]; then
+                CMD="$CMD --hours $hours"
+            fi
+
             # Execute the script
-            python /tmp/list_all_metrics.py
+            eval $CMD
             exit_code=$?
 
             if [ $exit_code -eq 0 ]; then
                 echo ""
-                echo "✅ All metrics listed successfully"
+                echo "✅ Metrics listed successfully"
             else
                 echo ""
                 echo "❌ Failed to list metrics"
@@ -520,7 +575,10 @@ EOF
             # Clean up
             rm -f /tmp/list_all_metrics.py
             """,
-            args=[],
+            args=[
+                Arg(name="filter", description="Filter metrics to only show those containing this substring (case-insensitive). Example: 'http' will show all metrics containing 'http'", required=False),
+                Arg(name="hours", description="Hours to look back for active metrics (default: 24)", required=False)
+            ],
             image="python:3.9-slim"
         )
 
