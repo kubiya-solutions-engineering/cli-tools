@@ -426,7 +426,7 @@ EOF
             """,
             args=[
                 Arg(name="operation", description="Operation to perform: 'search', 'query', or 'list'", required=True),
-                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Replace placeholders with actual values - FOR EXAMPLE use 'service:web-api' instead of '{service}', 'node:prod-1' instead of '{node}', etc. For 'by' clauses, use the actual tag value, not the tag name. Examples: 'avg:system.cpu.user', 'sum:nginx.requests{*} by {web-api}', 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}'", required=False),
+                Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Use correct Datadog tag syntax - When NO 'by' clause: use '{type:name}' format (e.g., '{service:freighthub}', '{node:prod-worker-1}'). When 'by' clause IS used: use 'by {type}' format (e.g., 'by {service}', 'by {node}'). Examples: 'sum:trace.http.request.hits{service:freighthub}', 'sum:trace.http.request.hits{service:freighthub} by {service}', 'avg:kubernetes.cpu.usage.total{node:prod-worker-1} by {node}'", required=False),
                 Arg(name="start_time", description="For 'query': Start time as Unix timestamp (e.g., '1640995200') or relative time like '-3600' for 3600 seconds ago (optional, defaults to 1 hour ago)", required=False),
                 Arg(name="end_time", description="For 'query': End time as Unix timestamp (e.g., '1640995200') or relative time like '-3600' for 3600 seconds ago (optional, defaults to now)", required=False)
             ],
