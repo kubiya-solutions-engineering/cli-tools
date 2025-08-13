@@ -327,8 +327,8 @@ def main():
     parser.add_argument('--operation', required=True, choices=['search', 'query', 'list'],
                        help='Operation to perform: search, query, or list')
     parser.add_argument('--query', help='For search: metric name pattern. For query: timeseries query')
-    parser.add_argument('--start_time', type=int, help='For query: Unix timestamp for start time')
-    parser.add_argument('--end_time', type=int, help='For query: Unix timestamp for end time')
+    parser.add_argument('--start_time', type=str, help='For query: Unix timestamp or relative time like "-3600" for start time')
+    parser.add_argument('--end_time', type=str, help='For query: Unix timestamp or relative time like "-3600" for end time')
     parser.add_argument('--hours', type=int, default=24, help='For list: hours to look back (default: 24)')
     
     args = parser.parse_args()
@@ -361,7 +361,7 @@ EOF
                 echo ""
                 echo "Available operations:"
                 echo "  • search --query <pattern>         - Search for metrics by name/pattern"
-                echo "  • query --query <metric_query> [--start_time <timestamp>] [--end_time <timestamp>] - Query timeseries data"
+                echo "  • query --query <metric_query> [--start_time <timestamp>] [--end_time <timestamp>] - Query timeseries data (timestamps can be Unix timestamps or relative like '-3600')"
                 echo "  • list [--hours <number>]          - List active metrics (default: last 24 hours)"
                 echo ""
                 echo "Examples:"
@@ -388,18 +388,18 @@ EOF
             echo ""
 
             # Build command with named arguments, only including non-empty values
-            CMD="python /tmp/datadog_metrics.py --operation \"$operation\""
+            CMD="python /tmp/datadog_metrics.py --operation '$operation'"
             
             if [ -n "$query" ]; then
-                CMD="$CMD --query \"$query\""
+                CMD="$CMD --query '$query'"
             fi
             
             if [ -n "$start_time" ]; then
-                CMD="$CMD --start_time \"$start_time\""
+                CMD="$CMD --start_time '$start_time'"
             fi
             
             if [ -n "$end_time" ]; then
-                CMD="$CMD --end_time \"$end_time\""
+                CMD="$CMD --end_time '$end_time'"
             fi
             
             # Execute the Python script with named arguments
@@ -427,8 +427,8 @@ EOF
             args=[
                 Arg(name="operation", description="Operation to perform: 'search', 'query', or 'list'", required=True),
                 Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Replace placeholders with actual values - FOR EXAMPLE use 'service:web-api' instead of '{service}', 'node:prod-1' instead of '{node}', etc. For 'by' clauses, use the actual tag value, not the tag name. Examples: 'avg:system.cpu.user', 'sum:nginx.requests{*} by {web-api}', 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}'", required=False),
-                Arg(name="start_time", description="For 'query': Start time as Unix timestamp or relative time like '-3600' for 3600 seconds ago (optional, defaults to 1 hour ago)", required=False),
-                Arg(name="end_time", description="For 'query': End time as Unix timestamp or relative time like '-3600' for 3600 seconds ago (optional, defaults to now)", required=False)
+                Arg(name="start_time", description="For 'query': Start time as Unix timestamp (e.g., '1640995200') or relative time like '-3600' for 3600 seconds ago (optional, defaults to 1 hour ago)", required=False),
+                Arg(name="end_time", description="For 'query': End time as Unix timestamp (e.g., '1640995200') or relative time like '-3600' for 3600 seconds ago (optional, defaults to now)", required=False)
             ],
             image="python:3.9-slim"
         )
@@ -552,7 +552,7 @@ EOF
             CMD="python /tmp/list_all_metrics.py"
             
             if [ -n "$filter" ]; then
-                CMD="$CMD --filter \"$filter\""
+                CMD="$CMD --filter '$filter'"
             fi
             
             if [ -n "$hours" ]; then
