@@ -197,11 +197,46 @@ class DatadogMetricsAPI:
         # Query timeseries data for a metric
         url = f"{self.base_url}/api/v1/query"
         
-        # Default to last hour if no time range specified
+        # Handle timestamp processing
+        now = datetime.now()
+        
+        # Process end_time
         if not end_time:
-            end_time = int(datetime.now().timestamp())
+            end_time = int(now.timestamp())
+        elif isinstance(end_time, str) and end_time.startswith('-'):
+            # Handle relative time like "-3600" (3600 seconds ago)
+            try:
+                seconds_ago = int(end_time[1:])  # Remove the minus sign
+                end_time = int((now - timedelta(seconds=seconds_ago)).timestamp())
+            except ValueError:
+                print(f"❌ Error: Invalid relative time format '{end_time}'. Use format like '-3600' for 3600 seconds ago.")
+                sys.exit(1)
+        else:
+            # Treat as absolute Unix timestamp
+            try:
+                end_time = int(end_time)
+            except ValueError:
+                print(f"❌ Error: Invalid timestamp '{end_time}'. Use Unix timestamp or relative time like '-3600'.")
+                sys.exit(1)
+        
+        # Process start_time
         if not start_time:
-            start_time = int((datetime.now() - timedelta(hours=1)).timestamp())
+            start_time = int((now - timedelta(hours=1)).timestamp())
+        elif isinstance(start_time, str) and start_time.startswith('-'):
+            # Handle relative time like "-3600" (3600 seconds ago)
+            try:
+                seconds_ago = int(start_time[1:])  # Remove the minus sign
+                start_time = int((now - timedelta(seconds=seconds_ago)).timestamp())
+            except ValueError:
+                print(f"❌ Error: Invalid relative time format '{start_time}'. Use format like '-3600' for 3600 seconds ago.")
+                sys.exit(1)
+        else:
+            # Treat as absolute Unix timestamp
+            try:
+                start_time = int(start_time)
+            except ValueError:
+                print(f"❌ Error: Invalid timestamp '{start_time}'. Use Unix timestamp or relative time like '-3600'.")
+                sys.exit(1)
         
         params = {
             "query": query,
@@ -332,8 +367,8 @@ EOF
                 echo "Examples:"
                 echo "  • search --query 'cpu'             - Find all metrics containing 'cpu'"
                 echo "  • query --query 'avg:system.cpu.user' - Get CPU user time data"
-                echo "  • query --query 'sum:nginx.requests{service:web-api}' --start_time -3600 - Get nginx request count for web-api service"
-                echo "  • query --query 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}' --start_time -3600 - Get CPU usage by node"
+                echo "  • query --query 'sum:nginx.requests{service:web-api}' --start_time -3600 - Get nginx request count for web-api service (last hour)"
+                echo "  • query --query 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}' --start_time -3600 - Get CPU usage by node (last hour)"
                 echo "  • list                             - List all active metrics from last 24h"
                 echo "  • list --hours 6                   - List metrics from last 6 hours"
                 echo ""
@@ -392,8 +427,8 @@ EOF
             args=[
                 Arg(name="operation", description="Operation to perform: 'search', 'query', or 'list'", required=True),
                 Arg(name="query", description="For 'search': metric name pattern to search for. For 'query': timeseries query. IMPORTANT: Replace placeholders with actual values - FOR EXAMPLE use 'service:web-api' instead of '{service}', 'node:prod-1' instead of '{node}', etc. For 'by' clauses, use the actual tag value, not the tag name. Examples: 'avg:system.cpu.user', 'sum:nginx.requests{*} by {web-api}', 'avg:kubernetes.cpu.usage.total{*} by {prod-worker-1}'", required=False),
-                Arg(name="start_time", description="For 'query': Unix timestamp for start time (optional, defaults to 1 hour ago)", required=False),
-                Arg(name="end_time", description="For 'query': Unix timestamp for end time (optional, defaults to now)", required=False)
+                Arg(name="start_time", description="For 'query': Start time as Unix timestamp or relative time like '-3600' for 3600 seconds ago (optional, defaults to 1 hour ago)", required=False),
+                Arg(name="end_time", description="For 'query': End time as Unix timestamp or relative time like '-3600' for 3600 seconds ago (optional, defaults to now)", required=False)
             ],
             image="python:3.9-slim"
         )
